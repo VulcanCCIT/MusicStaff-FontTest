@@ -79,47 +79,40 @@ struct ContentView: View {
   @State private var currentClef: Clef = .treble
   @State private var currentNote: StaffNote = StaffNote(name: "", midi: 60, y: 0)
 
-  // Note candidates using your existing Y positions
-  var trebleNoteChoices: [StaffNote] {
-    [
-      StaffNote(name: "C4", midi: 60, y: C4noteY),
-      StaffNote(name: "D4", midi: 62, y: D4noteY),
-      StaffNote(name: "E4", midi: 64, y: E4noteY),
-      StaffNote(name: "F4", midi: 65, y: F4noteY),
-      StaffNote(name: "G4", midi: 67, y: G4noteY),
-      StaffNote(name: "A4", midi: 69, y: A4noteY),
-      StaffNote(name: "B4", midi: 71, y: B4noteY),
-      StaffNote(name: "C5", midi: 72, y: C5noteY),
-      StaffNote(name: "D5", midi: 74, y: D5noteY),
-      StaffNote(name: "E5", midi: 76, y: E5noteY),
-      StaffNote(name: "F5", midi: 77, y: F5noteY),
-      StaffNote(name: "G5", midi: 79, y: G5noteY),
-      StaffNote(name: "A5", midi: 81, y: A5noteY),
-      StaffNote(name: "B5", midi: 83, y: B5noteY),
-      StaffNote(name: "C6", midi: 84, y: C6noteY)
-    ]
+  // MARK: - Note generation helpers
+  private func midiRange(for clef: Clef) -> ClosedRange<Int> {
+    switch clef {
+    case .treble:
+      return 60...108 // C4..C8
+    case .bass:
+      return 21...60  // A0..C4
+    }
   }
 
-  var bassNoteChoices: [StaffNote] {
-    // Using the provided Y values near middle C. To fully support bass-range notes
-    // (on/within the bass staff), we'll add more calibrated Y positions later.
-    [
-      StaffNote(name: "C4", midi: 60, y: C4noteY),
-      StaffNote(name: "D4", midi: 62, y: D4noteY),
-      StaffNote(name: "E4", midi: 64, y: E4noteY),
-      StaffNote(name: "F4", midi: 65, y: F4noteY),
-      StaffNote(name: "G4", midi: 67, y: G4noteY),
-      StaffNote(name: "A4", midi: 69, y: A4noteY),
-      StaffNote(name: "B4", midi: 71, y: B4noteY),
-      StaffNote(name: "C5", midi: 72, y: C5noteY)
-    ]
+  private func isNatural(_ midi: Int) -> Bool {
+    // C, D, E, F, G, A, B
+    return [0, 2, 4, 5, 7, 9, 11].contains(midi % 12)
+  }
+
+  private func noteName(for midi: Int) -> String {
+    let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+    let octave = midi / 12 - 1
+    return names[midi % 12] + String(octave)
+  }
+
+  private func yForMidi(_ midi: Int) -> CGFloat {
+    // Anchor at your provided C4 position and use an approximate semitone step.
+    // This keeps lower bass notes visible and aligns reasonably with your treble constants.
+    let semitoneStep: CGFloat = -3.25 // pixels per semitone (upwards is negative y)
+    return C4noteY + CGFloat(midi - 60) * semitoneStep
   }
 
   private func randomizeNote() {
     currentClef = Bool.random() ? .treble : .bass
-    let pool = (currentClef == .treble) ? trebleNoteChoices : bassNoteChoices
-    if let note = pool.randomElement() {
-      currentNote = note
+    let range = midiRange(for: currentClef)
+    let candidates = Array(range).filter(isNatural)
+    if let midi = candidates.randomElement() {
+      currentNote = StaffNote(name: noteName(for: midi), midi: midi, y: yForMidi(midi))
     }
   }
 
@@ -137,7 +130,7 @@ struct ContentView: View {
         // Draw the current note
         context.draw(wholeNote, at: CGPoint(x: noteX, y: currentNote.y))
       }
-      .frame(height: 280)
+      .frame(height: 360)
 
       // Labels for note name and MIDI code
       Text("Note: \(currentNote.name)    MIDI: \(currentNote.midi)")
