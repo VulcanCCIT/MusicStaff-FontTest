@@ -67,33 +67,93 @@ struct ContentView: View {
   let eightLineY: CGFloat = 75 //eightLine
   let nineLineY: CGFloat = 66 //nineLine
 
-  
-    var body: some View {
-      VStack {
-        HStack {
-          Canvas{ context, size in
-            context.draw(trebleStaff, at: CGPoint(x: 155, y: 150))
-            context.draw(bassStaff, at: CGPoint(x: 155, y: 220))
 
-            func drawAtX(_ x: CGFloat, _ text: Text, y: CGFloat) {
-              context.draw(text, at: CGPoint(x: x, y: y))
-              
-            }
+  struct StaffNote {
+    let name: String
+    let midi: Int
+    let y: CGFloat
+  }
 
-            drawAtX(sharedX, sextLine, y: sextLineY)
-            drawAtX(sharedX, sevenLine, y: sevenLineY)
-            drawAtX(sharedX, eightLine, y: eightLineY)
-            drawAtX(sharedX, nineLine, y: nineLineY)
-            drawAtX(noteX, wholeNote, y: C8noteY)
-           }
-        }
-      }
+  enum Clef { case treble, bass }
 
-        .padding()
+  @State private var currentClef: Clef = .treble
+  @State private var currentNote: StaffNote = StaffNote(name: "", midi: 60, y: 0)
+
+  // Note candidates using your existing Y positions
+  var trebleNoteChoices: [StaffNote] {
+    [
+      StaffNote(name: "C4", midi: 60, y: C4noteY),
+      StaffNote(name: "D4", midi: 62, y: D4noteY),
+      StaffNote(name: "E4", midi: 64, y: E4noteY),
+      StaffNote(name: "F4", midi: 65, y: F4noteY),
+      StaffNote(name: "G4", midi: 67, y: G4noteY),
+      StaffNote(name: "A4", midi: 69, y: A4noteY),
+      StaffNote(name: "B4", midi: 71, y: B4noteY),
+      StaffNote(name: "C5", midi: 72, y: C5noteY),
+      StaffNote(name: "D5", midi: 74, y: D5noteY),
+      StaffNote(name: "E5", midi: 76, y: E5noteY),
+      StaffNote(name: "F5", midi: 77, y: F5noteY),
+      StaffNote(name: "G5", midi: 79, y: G5noteY),
+      StaffNote(name: "A5", midi: 81, y: A5noteY),
+      StaffNote(name: "B5", midi: 83, y: B5noteY),
+      StaffNote(name: "C6", midi: 84, y: C6noteY)
+    ]
+  }
+
+  var bassNoteChoices: [StaffNote] {
+    // Using the provided Y values near middle C. To fully support bass-range notes
+    // (on/within the bass staff), we'll add more calibrated Y positions later.
+    [
+      StaffNote(name: "C4", midi: 60, y: C4noteY),
+      StaffNote(name: "D4", midi: 62, y: D4noteY),
+      StaffNote(name: "E4", midi: 64, y: E4noteY),
+      StaffNote(name: "F4", midi: 65, y: F4noteY),
+      StaffNote(name: "G4", midi: 67, y: G4noteY),
+      StaffNote(name: "A4", midi: 69, y: A4noteY),
+      StaffNote(name: "B4", midi: 71, y: B4noteY),
+      StaffNote(name: "C5", midi: 72, y: C5noteY)
+    ]
+  }
+
+  private func randomizeNote() {
+    currentClef = Bool.random() ? .treble : .bass
+    let pool = (currentClef == .treble) ? trebleNoteChoices : bassNoteChoices
+    if let note = pool.randomElement() {
+      currentNote = note
     }
+  }
+
+  var body: some View {
+    VStack(spacing: 16) {
+      // Staff and note drawing
+      Canvas { context, size in
+        switch currentClef {
+        case .treble:
+          context.draw(trebleStaff, at: CGPoint(x: 155, y: 150))
+        case .bass:
+          context.draw(bassStaff, at: CGPoint(x: 155, y: 220))
+        }
+
+        // Draw the current note
+        context.draw(wholeNote, at: CGPoint(x: noteX, y: currentNote.y))
+      }
+      .frame(height: 280)
+
+      // Labels for note name and MIDI code
+      Text("Note: \(currentNote.name)    MIDI: \(currentNote.midi)")
+        .font(.headline)
+
+      // Button to get a new random note on a random clef (only one clef at a time)
+      Button("New Note") {
+        randomizeNote()
+      }
+      .buttonStyle(.borderedProminent)
+    }
+    .onAppear { randomizeNote() }
+    .padding()
+  }
 }
 
 #Preview {
     ContentView()
 }
-
