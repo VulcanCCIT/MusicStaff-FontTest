@@ -44,7 +44,7 @@ public final class StaffViewModel: ObservableObject {
                 middleLineY: 150,
                 lineSpacing: 12.0,
                 staffCenterYOffset: 0,
-                noteCenterYOffset: 0,
+                noteCenterYOffset: -1.0,
                 ledgerCenterYOffset: 0
             )
         case .bass:
@@ -52,7 +52,7 @@ public final class StaffViewModel: ObservableObject {
                 middleLineY: 220,
                 lineSpacing: 12.0,
                 staffCenterYOffset: 0,
-                noteCenterYOffset: 0,
+                noteCenterYOffset: -1.0,
                 ledgerCenterYOffset: 0
             )
         }
@@ -84,11 +84,16 @@ public final class StaffViewModel: ObservableObject {
         guard abs(step) > 4 else { return [] }
         let noteY = noteY(for: midi, clef: clef)
         let evenSteps = ledgerLineSteps(for: step) // e.g., 6,8,... or -6,-8,... including `step` when even
-        return evenSteps.map { t in
-            // Move from the note's step to the ledger step `t` in units of positionStep
+        let candidates = evenSteps.map { t -> CGFloat in
             let deltaSteps = step - t
             return noteY + CGFloat(deltaSteps) * positionStep + m.ledgerCenterYOffset
         }
+        // Compute staff bounds (top and bottom staff lines)
+        let baseY = m.middleLineY + m.staffCenterYOffset
+        let topStaffY = baseY - 2 * m.lineSpacing
+        let bottomStaffY = baseY + 2 * m.lineSpacing
+        let epsilon: CGFloat = 0.5 // small tolerance
+        return candidates.filter { y in y < topStaffY - epsilon || y > bottomStaffY + epsilon }
     }
 
     // MARK: - Internals
