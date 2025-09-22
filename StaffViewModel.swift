@@ -25,19 +25,36 @@ public final class StaffViewModel: ObservableObject {
     }
 
     public struct StaffMetrics {
-        public let middleLineY: CGFloat
-        public let lineSpacing: CGFloat
+        public let middleLineY: CGFloat        // visual Y for the middle staff line
+        public let lineSpacing: CGFloat        // distance between adjacent staff lines
+        public let staffCenterYOffset: CGFloat // tweak if the glyph's visual center isn't exactly on the middle line
+        public let noteCenterYOffset: CGFloat  // tweak so staff/ledger line intersects note head center
+        public let ledgerCenterYOffset: CGFloat// tweak to vertically center the ledger line glyph on the intended line
     }
 
     public func metrics(for clef: Clef) -> StaffMetrics {
         // Assumptions:
-        // - The staff glyph is drawn centered on the middle line (B4 for treble, D3 for bass).
+        // - Staff glyph is drawn with anchor .center at the provided point.
+        // - middleLineY should correspond to the visual Y of the middle line.
         // - lineSpacing is the distance (in points) between adjacent staff lines.
+        // - Offsets allow visual fine-tuning to match the font's metrics.
         switch clef {
         case .treble:
-            return StaffMetrics(middleLineY: 150, lineSpacing: 12.0)
+            return StaffMetrics(
+                middleLineY: 150,
+                lineSpacing: 12.0,
+                staffCenterYOffset: 0,
+                noteCenterYOffset: 0,
+                ledgerCenterYOffset: 0
+            )
         case .bass:
-            return StaffMetrics(middleLineY: 220, lineSpacing: 12.0)
+            return StaffMetrics(
+                middleLineY: 220,
+                lineSpacing: 12.0,
+                staffCenterYOffset: 0,
+                noteCenterYOffset: 0,
+                ledgerCenterYOffset: 0
+            )
         }
     }
 
@@ -45,19 +62,33 @@ public final class StaffViewModel: ObservableObject {
         let m = metrics(for: clef)
         let positionStep = m.lineSpacing / 2.0 // line <-> space distance
         let step = staffStep(for: midi, clef: clef)
-        return m.middleLineY - CGFloat(step) * positionStep
+        return (m.middleLineY + m.staffCenterYOffset) - CGFloat(step) * positionStep
+    }
+
+    public func noteY(for midi: Int, clef: Clef) -> CGFloat {
+        let m = metrics(for: clef)
+        return y(for: midi, clef: clef) + m.noteCenterYOffset
     }
 
     public var currentY: CGFloat {
-        y(for: currentNote.midi, clef: currentClef)
+        noteY(for: currentNote.midi, clef: currentClef)
     }
 
     public func ledgerLineYs(for midi: Int, clef: Clef) -> [CGFloat] {
+        // Compute ledger lines relative to the note so a line-step note (even step)
+        // always gets a ledger line drawn through its visual center.
         let m = metrics(for: clef)
         let positionStep = m.lineSpacing / 2.0
         let step = staffStep(for: midi, clef: clef)
-        let steps = ledgerLineSteps(for: step)
-        return steps.map { s in m.middleLineY - CGFloat(s) * positionStep }
+        // Only draw ledger lines for notes strictly beyond the staff bounds
+        guard abs(step) > 4 else { return [] }
+        let noteY = noteY(for: midi, clef: clef)
+        let evenSteps = ledgerLineSteps(for: step) // e.g., 6,8,... or -6,-8,... including `step` when even
+        return evenSteps.map { t in
+            // Move from the note's step to the ledger step `t` in units of positionStep
+            let deltaSteps = step - t
+            return noteY + CGFloat(deltaSteps) * positionStep + m.ledgerCenterYOffset
+        }
     }
 
     // MARK: - Internals
