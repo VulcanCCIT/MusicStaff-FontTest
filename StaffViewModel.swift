@@ -41,21 +41,36 @@ public final class StaffViewModel: ObservableObject {
         switch clef {
         case .treble:
             return StaffMetrics(
-                middleLineY: 150,
-                lineSpacing: 12.0,
-                staffCenterYOffset: 0,
-                noteCenterYOffset: -1.0,
-                ledgerCenterYOffset: 0
+                middleLineY: 160, //was 150
+                lineSpacing: 12.5, //was 12
+                staffCenterYOffset: -4.7, //was 0
+                noteCenterYOffset: -0.5, //was -1.0
+                ledgerCenterYOffset: 0 // vector strokes are centered, no glyph offset needed
             )
         case .bass:
             return StaffMetrics(
                 middleLineY: 220,
-                lineSpacing: 12.0,
-                staffCenterYOffset: 0,
-                noteCenterYOffset: -1.0,
+                lineSpacing: 12.5, //was 10
+                staffCenterYOffset: 4.7, //was 0
+                noteCenterYOffset: 0.5, //was -1.0
                 ledgerCenterYOffset: 0
             )
         }
+    }
+
+    // Debug helpers
+    public func staffLineYs(for clef: Clef) -> [CGFloat] {
+        // Returns Y positions for the five staff lines: steps -4, -2, 0, 2, 4
+        let m = metrics(for: clef)
+        let baseY = m.middleLineY + m.staffCenterYOffset
+        let positionStep = m.lineSpacing / 2.0
+        let lineSteps = [-4, -2, 0, 2, 4]
+        return lineSteps.map { s in baseY - CGFloat(s) * positionStep }
+    }
+
+    public func step(for midi: Int, clef: Clef) -> Int {
+        // Exposes the internal step calculation for debugging
+        return staffStep(for: midi, clef: clef)
     }
 
     public func y(for midi: Int, clef: Clef) -> CGFloat {

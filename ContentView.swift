@@ -36,21 +36,55 @@ struct ContentView: View {
     VStack(spacing: 16) {
       // Staff and note drawing
       Canvas { context, size in
+        let showDebug = true
+
         // Choose staff
         let staffPoint = (vm.currentClef == .treble) ? trebleStaffPoint : bassStaffPoint
         let staffText  = (vm.currentClef == .treble) ? trebleStaff : bassStaff
         context.draw(staffText, at: staffPoint)
 
-        // Draw ledger lines (if any)
+        if showDebug {
+          // Draw staff line guides (green)
+          let ys = vm.staffLineYs(for: vm.currentClef)
+          for y in ys {
+            // Center a thin green line exactly on the computed Y
+            let stroke: CGFloat = 0.5
+            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+          }
+
+          // Draw computed ledger line positions (red), centered on Y
+          let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+          for y in ledgerYs {
+            let stroke: CGFloat = 0.75
+            let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
+            context.fill(Path(rect), with: .color(.red.opacity(0.7)))
+          }
+
+          // Draw the computed note center (blue crosshair)
+          let ny = vm.currentY
+          let crossW: CGFloat = 10
+          let crossH: CGFloat = 10
+          let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
+          let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
+          context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+          context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+        }
+
+        // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
         let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+        let ledgerLength: CGFloat = lineWidth // reuse approximate glyph width as the visual length
+        let strokeWidth: CGFloat = 1.2
         for y in ledgerYs {
-          // Centered at noteX, using singleLine glyph for a short ledger line
-          context.draw(singleLine, at: CGPoint(x: noteX, y: y))
+          var p = Path()
+          p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
+          p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
+          context.stroke(p, with: .color(.primary), lineWidth: strokeWidth)
         }
 
         // Draw the current note
         let notePoint = CGPoint(x: noteX, y: vm.currentY)
-        context.draw(wholeNote, at: notePoint)
+        context.draw(wholeNote, at: notePoint, anchor: .center)
       }
       .frame(height: 360)
 
