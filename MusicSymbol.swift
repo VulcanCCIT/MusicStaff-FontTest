@@ -62,7 +62,7 @@ enum MusicSymbol {
   var defaultSize: CGFloat {
     switch self {
       case .bassStaff, .trebleStaff:
-      return 60
+      return 70 //was 60
     case .singleLine:
       return 30
       case .wholeNote, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine:

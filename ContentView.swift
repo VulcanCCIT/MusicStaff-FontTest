@@ -21,79 +21,100 @@ struct ContentView: View {
   let eightLine = MusicSymbol.eightLine.text()
   let nineLine = MusicSymbol.nineLine.text()
   let wholeNote = MusicSymbol.wholeNote.text()
-  
+
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
 
-  let C4noteY: CGFloat = 190
-  let D4noteY: CGFloat = 182
-  let E4noteY: CGFloat = 175
-  let F4noteY: CGFloat = 170
-  let G4noteY: CGFloat = 165
-  let A4noteY: CGFloat = 160
-  let B4noteY: CGFloat = 154
-  let C5noteY: CGFloat = 149
-  let D5noteY: CGFloat = 144
-  let E5noteY: CGFloat = 138
-  let F5noteY: CGFloat = 133
-  let G5noteY: CGFloat = 126  //noLine
-  let A5noteY: CGFloat = 123 //singleLine
-  let B5noteY: CGFloat = 117 //singleLine
-  let C6noteY: CGFloat = 112 //doubleLine
-  let D6noteY: CGFloat = 106 //doubleLine
-  let E6noteY: CGFloat = 102 //tripleLine
-  let F6noteY: CGFloat = 96 //tripleLine
-  let G6noteY: CGFloat = 93 //quadLine
-  let A6noteY: CGFloat = 87 //quadLine
-  let B6noteY: CGFloat = 81 //quinLine
-  let C7noteY: CGFloat = 75 //sextLine
-  let D7noteY: CGFloat = 71 //sextLine
-  let E7noteY: CGFloat = 65 //sextLine
-  let F7noteY: CGFloat = 63 //sevenLine
-  let G7noteY: CGFloat = 56 //sevenLine
-  let A7noteY: CGFloat = 55 //eightLine
-  let B7noteY: CGFloat = 48 //eightLine
-  let C8noteY: CGFloat = 46 //nineLine
+  @StateObject private var vm = StaffViewModel()
 
+  // Staff drawing control (positions match your previous staff anchors)
+  private let trebleStaffPoint = CGPoint(x: 155, y: 150)
+  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
+  private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
-  let C4LineY: CGFloat = 205 //C4singleLine
-  let singleLineY: CGFloat = 135 //singleLine
-  let doubleLineY: CGFloat = 137 //doubleLine
-  let tripleLineY: CGFloat = 132 //tripleLine
-  let quadLineY: CGFloat = 128 //quadLine
-  let quinLineY: CGFloat = 121 //quinLine
-  let sextLineY: CGFloat = 116 //sextLine
-  let sevenLineY: CGFloat = 83 //sevenLine
-  let eightLineY: CGFloat = 75 //eightLine
-  let nineLineY: CGFloat = 66 //nineLine
+  var body: some View {
+    VStack(spacing: 16) {
+      // Staff and note drawing
+      Canvas { context, size in
+        let showDebug = false //turns on debug positioning lines.
 
-  
-    var body: some View {
-      VStack {
-        HStack {
-          Canvas{ context, size in
-            context.draw(trebleStaff, at: CGPoint(x: 155, y: 150))
-            context.draw(bassStaff, at: CGPoint(x: 155, y: 220))
+        // Draw both staffs
+        context.draw(trebleStaff, at: trebleStaffPoint)
+        context.draw(bassStaff, at: bassStaffPoint)
 
-            func drawAtX(_ x: CGFloat, _ text: Text, y: CGFloat) {
-              context.draw(text, at: CGPoint(x: x, y: y))
-              
-            }
+        if showDebug {
+          // Draw staff line guides (green) for both staffs
+          let stroke: CGFloat = 0.5
+          let trebleYs = vm.staffLineYs(for: .treble)
+          for y in trebleYs {
+            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+          }
+          let bassYs = vm.staffLineYs(for: .bass)
+          for y in bassYs {
+            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+          }
 
-            drawAtX(sharedX, sextLine, y: sextLineY)
-            drawAtX(sharedX, sevenLine, y: sevenLineY)
-            drawAtX(sharedX, eightLine, y: eightLineY)
-            drawAtX(sharedX, nineLine, y: nineLineY)
-            drawAtX(noteX, wholeNote, y: C8noteY)
-           }
+          // Draw computed ledger line positions (red), centered on Y
+          let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+          for y in ledgerYs {
+            let stroke: CGFloat = 0.75
+            let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
+            context.fill(Path(rect), with: .color(.red.opacity(0.7)))
+          }
+
+          // Draw the computed note center (blue crosshair)
+          let ny = vm.currentY
+          let crossW: CGFloat = 10
+          let crossH: CGFloat = 10
+          let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
+          let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
+          context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+          context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
         }
+
+        // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
+        let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+        let ledgerLength: CGFloat = lineWidth // reuse approximate glyph width as the visual length
+        let strokeWidth: CGFloat = 1.2
+        for y in ledgerYs {
+          var p = Path()
+          p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
+          p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
+          context.stroke(p, with: .color(.primary), lineWidth: strokeWidth)
+        }
+
+        // Draw the current note
+        let notePoint = CGPoint(x: noteX, y: vm.currentY)
+        context.draw(wholeNote, at: notePoint, anchor: .center)
+      }
+      .frame(height: 360)
+      .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
+
+      // Labels for clef, note name and MIDI code
+      HStack(spacing: 12) {
+        Text("Clef:")
+        Text(vm.currentClef == .treble ? "Treble" : "Bass")
+        Text("Note:")
+        Text(vm.currentNote.name).monospaced()
+        Text("MIDI:")
+        Text(String(vm.currentNote.midi)).monospaced()
       }
 
-        .padding()
+      // Button to get a new random note on a random clef (only one clef at a time)
+      Button("New Note") {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+          vm.randomizeNote()
+        }
+      }
+      .buttonStyle(.borderedProminent)
     }
+    .onAppear { vm.randomizeNote() }
+    .padding()
+  }
 }
 
 #Preview {
     ContentView()
 }
-
