@@ -49,11 +49,11 @@ public final class StaffViewModel: ObservableObject {
             )
         case .bass:
             return StaffMetrics(
-                middleLineY: 220,
-                lineSpacing: 12.5, //was 10
-                staffCenterYOffset: 4.7, //was 0
-                noteCenterYOffset: 0.5, //was -1.0
-                ledgerCenterYOffset: 0
+                middleLineY: 230,
+                lineSpacing: 12.5,
+                staffCenterYOffset: 4.7,
+                noteCenterYOffset: 0.5,
+                ledgerCenterYOffset: 0.0
             )
         }
     }
@@ -165,3 +165,4 @@ public final class StaffViewModel: ObservableObject {
         }
     }
 }
+

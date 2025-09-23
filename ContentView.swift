@@ -29,26 +29,29 @@ struct ContentView: View {
 
   // Staff drawing control (positions match your previous staff anchors)
   private let trebleStaffPoint = CGPoint(x: 155, y: 150)
-  private let bassStaffPoint   = CGPoint(x: 155, y: 220)
+  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
   private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
   var body: some View {
     VStack(spacing: 16) {
       // Staff and note drawing
       Canvas { context, size in
-        let showDebug = true
+        let showDebug = false //turns on debug positioning lines.
 
-        // Choose staff
-        let staffPoint = (vm.currentClef == .treble) ? trebleStaffPoint : bassStaffPoint
-        let staffText  = (vm.currentClef == .treble) ? trebleStaff : bassStaff
-        context.draw(staffText, at: staffPoint)
+        // Draw both staffs
+        context.draw(trebleStaff, at: trebleStaffPoint)
+        context.draw(bassStaff, at: bassStaffPoint)
 
         if showDebug {
-          // Draw staff line guides (green)
-          let ys = vm.staffLineYs(for: vm.currentClef)
-          for y in ys {
-            // Center a thin green line exactly on the computed Y
-            let stroke: CGFloat = 0.5
+          // Draw staff line guides (green) for both staffs
+          let stroke: CGFloat = 0.5
+          let trebleYs = vm.staffLineYs(for: .treble)
+          for y in trebleYs {
+            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+          }
+          let bassYs = vm.staffLineYs(for: .bass)
+          for y in bassYs {
             let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
             context.fill(Path(rect), with: .color(.green.opacity(0.8)))
           }
@@ -87,6 +90,7 @@ struct ContentView: View {
         context.draw(wholeNote, at: notePoint, anchor: .center)
       }
       .frame(height: 360)
+      .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -100,7 +104,9 @@ struct ContentView: View {
 
       // Button to get a new random note on a random clef (only one clef at a time)
       Button("New Note") {
-        vm.randomizeNote()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+          vm.randomizeNote()
+        }
       }
       .buttonStyle(.borderedProminent)
     }
