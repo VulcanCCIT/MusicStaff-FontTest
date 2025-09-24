@@ -44,7 +44,7 @@ public final class StaffViewModel: ObservableObject {
                 middleLineY: 160, //was 150
                 lineSpacing: 12.5, //was 12
                 staffCenterYOffset: -4.7, //was 0
-                noteCenterYOffset: -0.5, //was -1.0
+                noteCenterYOffset: -0.2, //was -0.5
                 ledgerCenterYOffset: 0 // vector strokes are centered, no glyph offset needed
             )
         case .bass:
