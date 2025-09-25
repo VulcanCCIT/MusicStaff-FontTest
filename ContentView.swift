@@ -139,6 +139,23 @@ struct ContentView: View {
   }
 }
 
-#Preview {
-    ContentView()
+#Preview("Whole") {
+    let data = AppData()
+    data.noteHeadStyle = .whole
+    return ContentView()
+        .environmentObject(data)
+}
+
+#Preview("Half") {
+    let data = AppData()
+    data.noteHeadStyle = .half
+    return ContentView()
+        .environmentObject(data)
+}
+
+#Preview("Quarter") {
+    let data = AppData()
+    data.noteHeadStyle = .quarter
+    return ContentView()
+        .environmentObject(data)
 }
