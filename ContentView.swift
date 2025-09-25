@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
+  @EnvironmentObject private var appData: AppData
 
   let trebleStaff = MusicSymbol.trebleStaff.text()
   let bassStaff = MusicSymbol.bassStaff.text()
@@ -20,7 +21,6 @@ struct ContentView: View {
   let sevenLine = MusicSymbol.sevenLine.text()
   let eightLine = MusicSymbol.eightLine.text()
   let nineLine = MusicSymbol.nineLine.text()
-  let wholeNote = MusicSymbol.wholeNote.text()
 
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
@@ -31,6 +31,21 @@ struct ContentView: View {
   private let trebleStaffPoint = CGPoint(x: 155, y: 150)
   private let bassStaffPoint   = CGPoint(x: 155, y: 230)
   private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
+
+  private var currentNoteSymbol: MusicSymbol {
+    // Determine stem direction relative to the middle staff line
+    let step = vm.step(for: vm.currentNote.midi, clef: vm.currentClef)
+    let stemUp = step > 0 // above middle line => stem up; below => stem down; middle (0) can default to down
+
+    switch appData.noteHeadStyle {
+    case .whole:
+      return .wholeNote
+    case .half:
+      return stemUp ? .halfNoteUP : .halfNoteDown
+    case .quarter:
+      return stemUp ? .quarterNoteUP : .quarterNoteDown
+    }
+  }
 
   var body: some View {
     VStack(spacing: 16) {
@@ -87,10 +102,19 @@ struct ContentView: View {
 
         // Draw the current note
         let notePoint = CGPoint(x: noteX, y: vm.currentY)
-        context.draw(wholeNote, at: notePoint, anchor: .center)
+        let noteText = currentNoteSymbol.text()
+        context.draw(noteText, at: notePoint, anchor: .center)
       }
       .frame(height: 360)
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
+
+      // Note style picker
+      Picker("Note", selection: $appData.noteHeadStyle) {
+        Text("Whole").tag(NoteHeadStyle.whole)
+        Text("Half").tag(NoteHeadStyle.half)
+        Text("Quarter").tag(NoteHeadStyle.quarter)
+      }
+      .pickerStyle(.segmented)
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {

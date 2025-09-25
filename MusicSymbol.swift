@@ -20,6 +20,11 @@ enum MusicSymbol {
   case eightLine
   case nineLine
   case wholeNote
+  case halfNoteUP
+  case halfNoteDown
+  case quarterNoteUP
+  case quarterNoteDown
+  
 
   var codepoint: String {
     switch self {
@@ -47,14 +52,23 @@ enum MusicSymbol {
         return "\u{E016}"
       case .wholeNote:
       return "\u{E1D2}"
-    }
+      case .halfNoteUP:
+        return "\u{E1D3}"
+      case .halfNoteDown:
+        return "\u{E1D4}"
+        case .quarterNoteUP:
+        return "\u{E1D5}"
+      case .quarterNoteDown:
+        return "\u{E1D6}"
+        
+  }
   }
 
   var fontName: String {
     switch self {
       case .bassStaff, .trebleStaff:
       return "MusGlyphs"
-      case .singleLine, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .wholeNote:
+      case .singleLine, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown:
       return "Bravura"
     }
   }
@@ -65,7 +79,7 @@ enum MusicSymbol {
       return 70 //was 60
     case .singleLine:
       return 30
-      case .wholeNote, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine:
+      case .wholeNote, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown:
       return 40
     }
   }

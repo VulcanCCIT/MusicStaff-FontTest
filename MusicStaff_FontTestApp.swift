@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct MusicStaff_FontTestApp: App {
+    @StateObject private var appData = AppData()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appData)
         }
     }
 }
