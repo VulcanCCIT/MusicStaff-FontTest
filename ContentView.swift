@@ -241,7 +241,7 @@ struct ContentView: View {
   @StateObject private var vm = StaffViewModel()
   @StateObject private var conductor = MIDIMonitorConductor()
   @State private var advanceWorkItem: DispatchWorkItem?
-  private let autoAdvanceDebounce: TimeInterval = 0.25
+  // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
   @State private var showingCalibration = false
 
@@ -427,7 +427,7 @@ struct ContentView: View {
         }
       }
       advanceWorkItem = work
-      DispatchQueue.main.asyncAfter(deadline: .now() + autoAdvanceDebounce, execute: work)
+      DispatchQueue.main.asyncAfter(deadline: .now() + appData.autoAdvanceDebounce, execute: work)
     }
     .onDisappear {
       advanceWorkItem?.cancel()
@@ -459,6 +459,22 @@ struct ContentView: View {
           // Right-aligned calibration label and button
           HStack(spacing: 8) {
               Spacer()
+              // Debounce control
+              HStack(spacing: 6) {
+                  Image(systemName: "timer")
+                      .foregroundStyle(.secondary)
+                  Picker("Debounce", selection: $appData.autoAdvanceDebounce) {
+                      Text("Off").tag(0.0)
+                      Text("0.15s").tag(0.15)
+                      Text("0.25s").tag(0.25)
+                      Text("0.5s").tag(0.5)
+                      Text("1.0s").tag(1.0)
+                  }
+                  .pickerStyle(.menu)
+                  .frame(width: 110)
+                  .help("Time to wait before auto-advancing after a correct note.")
+              }
+              .padding(.trailing, 8)
               Text(calibrationDisplayText)
                   .font(.footnote)
                   .foregroundStyle(.secondary)
