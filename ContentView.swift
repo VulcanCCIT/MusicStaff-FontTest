@@ -240,6 +240,8 @@ struct ContentView: View {
 
   @StateObject private var vm = StaffViewModel()
   @StateObject private var conductor = MIDIMonitorConductor()
+  @State private var advanceWorkItem: DispatchWorkItem?
+  private let autoAdvanceDebounce: TimeInterval = 0.25
 
   @State private var showingCalibration = false
 
@@ -415,12 +417,20 @@ struct ContentView: View {
     .onChange(of: conductor.data.noteOn) { newValue in
       // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
       guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
-      // If the played note matches the current target note, auto-advance to a new one
-      if newValue == vm.currentNote.midi {
+      // If the played note matches the current target note, schedule a debounced auto-advance
+      guard newValue == vm.currentNote.midi else { return }
+      // Cancel any pending advance and schedule a new one
+      advanceWorkItem?.cancel()
+      let work = DispatchWorkItem {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
           randomizeNoteRespectingCalibration()
         }
       }
+      advanceWorkItem = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + autoAdvanceDebounce, execute: work)
+    }
+    .onDisappear {
+      advanceWorkItem?.cancel()
     }
     .padding()
   }
