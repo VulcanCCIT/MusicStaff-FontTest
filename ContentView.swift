@@ -469,11 +469,11 @@ struct ContentView: View {
               HStack(spacing: 6) {
                   Image(systemName: "timer")
                   .foregroundStyle(.blue)
-                      .foregroundStyle(.secondary)
+                      //.foregroundStyle(.secondary)
                   Text("Debounce:")
                   .font(.headline)
                       .foregroundStyle(.blue)
-                      .frame(width: 85)
+                      .frame(width: 70)
                      // .padding(.trailing, 2)
                   Picker("Debounce", selection: $appData.autoAdvanceDebounce) {
                       Text("Off").tag(0.0)
@@ -489,9 +489,10 @@ struct ContentView: View {
               }
 
               Text(calibrationDisplayText)
-                  .font(.footnote)
-                  .foregroundStyle(.secondary)
-                  .lineLimit(1)
+              .font(.headline)
+                  .foregroundStyle(.blue)
+                  //.lineLimit(1)
+                  .frame(width: 110)
 
               Button("Calibrate") { showingCalibration = true }
                   .buttonStyle(.bordered)
