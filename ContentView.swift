@@ -269,6 +269,14 @@ struct ContentView: View {
       
       // Staff and note drawing
       Canvas { context, size in
+        // Center the entire staff/note drawing within the canvas
+        let centerX = size.width / 2
+        let centerY = size.height / 2
+        let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
+        let offsetX = centerX - noteX
+        let offsetY = centerY - originalGroupMidY
+        context.translateBy(x: offsetX, y: offsetY)
+
         let showDebug = false //turns on debug positioning lines.
 
         // Draw both staffs
@@ -327,13 +335,6 @@ struct ContentView: View {
       .frame(height: 360)
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
-      // Note style picker
-      Picker("Note", selection: $appData.noteHeadStyle) {
-        Text("Whole").tag(NoteHeadStyle.whole)
-        Text("Half").tag(NoteHeadStyle.half)
-        Text("Quarter").tag(NoteHeadStyle.quarter)
-      }
-      .pickerStyle(.segmented)
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -381,24 +382,29 @@ struct ContentView: View {
     .padding()
   }
   var midiReceivedIndicator: some View {
-      HStack(spacing: 15) {
-          Text("MIDI In")
-              .fontWeight(.medium)
-          Circle()
-              .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
-              .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
-              .frame(maxWidth: 20, maxHeight: 20)
-          Spacer()
-//          Text("Toggle On")
-//              .fontWeight(.medium)
-//          Circle()
-//              .strokeBorder(.red.opacity(0.5), lineWidth: 1)
-//              .background(Circle().fill(conductor.isToggleOn ? .red : .red.opacity(0.2)))
-//              .frame(maxWidth: 20, maxHeight: 20)
-//              .shadow(color: conductor.isToggleOn ? .red : .clear, radius: 5)
+      ZStack {
+          // Left-aligned MIDI In indicator
+          HStack(spacing: 15) {
+              Text("MIDI In")
+                  .fontWeight(.medium)
+              Circle()
+                  .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
+                  .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
+                  .frame(maxWidth: 20, maxHeight: 20)
+              Spacer()
+          }
+
+          // Centered Note style picker
+          Picker("Note", selection: $appData.noteHeadStyle) {
+              Text("Whole").tag(NoteHeadStyle.whole)
+              Text("Half").tag(NoteHeadStyle.half)
+              Text("Quarter").tag(NoteHeadStyle.quarter)
+          }
+          .pickerStyle(.segmented)
+          .frame(maxWidth: 320)
       }
       .padding([.top, .horizontal], 20)
-      .frame(maxWidth: .infinity, maxHeight: 50, alignment: .leading)
+      .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
   }
 
 }
