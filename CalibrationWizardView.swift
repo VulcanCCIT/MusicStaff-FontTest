@@ -86,7 +86,7 @@ struct CalibrationWizardView: View {
         .padding()
         .onAppear { conductor.start() }
         .onDisappear { conductor.stop() }
-        .onChange(of: conductor.data.noteOn) { newValue in
+        .onChange(of: conductor.data.noteOn) { _, newValue in
             guard newValue > 0 else { return }
             handleIncoming(note: newValue)
         }

@@ -244,6 +244,7 @@ struct ContentView: View {
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
   @State private var showingCalibration = false
+  @State private var showDebugOverlays = false
 
   private var currentNoteSymbol: MusicSymbol {
     // Determine stem direction relative to the middle staff line
@@ -306,13 +307,11 @@ struct ContentView: View {
         let offsetY = centerY - originalGroupMidY
         context.translateBy(x: offsetX, y: offsetY)
 
-        let showDebug = false //turns on debug positioning lines.
-
         // Draw both staffs
         context.draw(trebleStaff, at: trebleStaffPoint)
         context.draw(bassStaff, at: bassStaffPoint)
 
-        if showDebug {
+        if showDebugOverlays {
           // Draw staff line guides (green) for both staffs
           let stroke: CGFloat = 0.5
           let trebleYs = vm.staffLineYs(for: .treble)
@@ -406,15 +405,15 @@ struct ContentView: View {
       randomizeNoteRespectingCalibration()
       conductor.start()
     }
-    .onChange(of: appData.minMIDINote) { _ in
+    .onChange(of: appData.minMIDINote) { _, _ in
       vm.setAllowedMIDIRange(appData.calibratedRange)
       randomizeNoteRespectingCalibration()
     }
-    .onChange(of: appData.maxMIDINote) { _ in
+    .onChange(of: appData.maxMIDINote) { _, _ in
       vm.setAllowedMIDIRange(appData.calibratedRange)
       randomizeNoteRespectingCalibration()
     }
-    .onChange(of: conductor.data.noteOn) { newValue in
+    .onChange(of: conductor.data.noteOn) { _, newValue in
       // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
       guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
       // If the played note matches the current target note, schedule a debounced auto-advance
