@@ -435,7 +435,7 @@ struct ContentView: View {
     .padding()
   }
   var midiReceivedIndicator: some View {
-      ZStack {
+      HStack(alignment: .center) {
           // Left-aligned MIDI In indicator
           HStack(spacing: 15) {
               Text("MIDI In")
@@ -444,25 +444,37 @@ struct ContentView: View {
                   .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
                   .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
                   .frame(maxWidth: 20, maxHeight: 20)
-              Spacer()
           }
 
-          // Centered Note style picker
-          Picker("Note", selection: $appData.noteHeadStyle) {
-              Text("Whole").tag(NoteHeadStyle.whole)
-              Text("Half").tag(NoteHeadStyle.half)
-              Text("Quarter").tag(NoteHeadStyle.quarter)
-          }
-          .pickerStyle(.segmented)
-          .frame(maxWidth: 320)
+          Spacer()
 
-          // Right-aligned calibration label and button
+          // Centered Note style picker (no overlay, so nothing can overlap it)
           HStack(spacing: 8) {
-              Spacer()
-              // Debounce control
+              Text("Note")
+              Picker("Note", selection: $appData.noteHeadStyle) {
+                  Text("Whole").tag(NoteHeadStyle.whole)
+                  Text("Half").tag(NoteHeadStyle.half)
+                  Text("Quarter").tag(NoteHeadStyle.quarter)
+              }
+              .labelsHidden()
+              .pickerStyle(.segmented)
+              .frame(width: 320)
+          }
+
+          Spacer()
+
+          // Right-aligned controls
+          HStack(spacing: 12) {
+              // Debounce control (label fixed width)
               HStack(spacing: 6) {
                   Image(systemName: "timer")
+                  .foregroundStyle(.blue)
                       .foregroundStyle(.secondary)
+                  Text("Debounce:")
+                  .font(.headline)
+                      .foregroundStyle(.blue)
+                      .frame(width: 85)
+                     // .padding(.trailing, 2)
                   Picker("Debounce", selection: $appData.autoAdvanceDebounce) {
                       Text("Off").tag(0.0)
                       Text("0.15s").tag(0.15)
@@ -470,15 +482,17 @@ struct ContentView: View {
                       Text("0.5s").tag(0.5)
                       Text("1.0s").tag(1.0)
                   }
+                  .labelsHidden()
                   .pickerStyle(.menu)
                   .frame(width: 110)
                   .help("Time to wait before auto-advancing after a correct note.")
               }
-              .padding(.trailing, 8)
+
               Text(calibrationDisplayText)
                   .font(.footnote)
                   .foregroundStyle(.secondary)
                   .lineLimit(1)
+
               Button("Calibrate") { showingCalibration = true }
                   .buttonStyle(.bordered)
           }
