@@ -121,7 +121,7 @@ struct ContentView: View {
         Text("Clef:")
         Text(vm.currentClef == .treble ? "Treble" : "Bass")
         Text("Note:")
-        Text(vm.currentNote.name).monospaced()
+        Text(vm.currentNote.name).monospaced() //ToDo look for this note with midiKit
         Text("MIDI:")
         Text(String(vm.currentNote.midi)).monospaced()
       }
