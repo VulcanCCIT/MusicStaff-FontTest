@@ -332,7 +332,7 @@ struct ContentView: View {
         context.draw(noteText, at: notePoint, anchor: .center)
         
       }
-      .frame(height: 360)
+      .frame(height: 420)
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
 
