@@ -36,7 +36,7 @@ enum MIDIEventType {
 }
 
 class MIDIMonitorConductor: ObservableObject, MIDIListener {
-    let midi = MIDI()
+    let midi = AudioKit.MIDI()
     @Published var data = MIDIMonitorData()
     @Published var isShowingMIDIReceived: Bool = false
     @Published var isToggleOn: Bool = false
@@ -241,11 +241,7 @@ struct ContentView: View {
   @StateObject private var vm = StaffViewModel()
   @StateObject private var conductor = MIDIMonitorConductor()
 
-
-  // Staff drawing control (positions match your previous staff anchors)
-  private let trebleStaffPoint = CGPoint(x: 155, y: 150)
-  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
-  private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
+  @State private var showingCalibration = false
 
   private var currentNoteSymbol: MusicSymbol {
     // Determine stem direction relative to the middle staff line
@@ -259,6 +255,37 @@ struct ContentView: View {
       return stemUp ? .halfNoteUP : .halfNoteDown
     case .quarter:
       return stemUp ? .quarterNoteUP : .quarterNoteDown
+    }
+  }
+
+  private func isInCalibratedRange(_ midi: Int) -> Bool {
+    guard let range = appData.calibratedRange else { return true }
+    return range.contains(midi)
+  }
+
+  private func randomizeNoteRespectingCalibration(maxAttempts: Int = 12) {
+    // Ensure StaffViewModel knows the allowed range
+    vm.setAllowedMIDIRange(appData.calibratedRange)
+    var attempts = 0
+    repeat {
+      vm.randomizeNote()
+      attempts += 1
+      if isInCalibratedRange(vm.currentNote.midi) { break }
+    } while attempts < maxAttempts
+  }
+
+  private var calibrationDisplayText: String {
+    if let range = appData.calibratedRange {
+      let lo = range.lowerBound
+      let hi = range.upperBound
+      let size = range.count
+      if lo == 0 && hi == 127 {
+        return "Uncalibrated"
+      } else {
+        return "\(noteName(from: lo))–\(noteName(from: hi)) (\(size) keys)"
+      }
+    } else {
+      return "Uncalibrated"
     }
   }
 
@@ -367,17 +394,23 @@ struct ContentView: View {
       // Button to get a new random note on a random clef (only one clef at a time)
       Button("New Note") {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-          vm.randomizeNote()
+          randomizeNoteRespectingCalibration()
         }
       }
       .buttonStyle(.borderedProminent)
     }//vstack
     .onAppear {
-      vm.randomizeNote()
+      vm.setAllowedMIDIRange(appData.calibratedRange)
+      randomizeNoteRespectingCalibration()
       conductor.start()
     }
-    .onDisappear {
-      conductor.stop()
+    .onChange(of: appData.minMIDINote) { _ in
+      vm.setAllowedMIDIRange(appData.calibratedRange)
+      randomizeNoteRespectingCalibration()
+    }
+    .onChange(of: appData.maxMIDINote) { _ in
+      vm.setAllowedMIDIRange(appData.calibratedRange)
+      randomizeNoteRespectingCalibration()
     }
     .padding()
   }
@@ -402,10 +435,30 @@ struct ContentView: View {
           }
           .pickerStyle(.segmented)
           .frame(maxWidth: 320)
+
+          // Right-aligned calibration label and button
+          HStack(spacing: 8) {
+              Spacer()
+              Text(calibrationDisplayText)
+                  .font(.footnote)
+                  .foregroundStyle(.secondary)
+                  .lineLimit(1)
+              Button("Calibrate") { showingCalibration = true }
+                  .buttonStyle(.bordered)
+          }
       }
       .padding([.top, .horizontal], 20)
       .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
+      .sheet(isPresented: $showingCalibration) {
+          CalibrationWizardView(isPresented: $showingCalibration)
+              .environmentObject(appData)
+      }
   }
+
+  // Staff drawing control (positions match your previous staff anchors)
+  private let trebleStaffPoint = CGPoint(x: 155, y: 150)
+  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
+  private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
 }
 

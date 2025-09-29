@@ -1,6 +1,8 @@
 import SwiftUI
 import Combine
 
+public typealias MIDI = Int
+
 public struct StaffNote {
     public let name: String
     public let midi: Int
@@ -12,13 +14,34 @@ public final class StaffViewModel: ObservableObject {
     @Published public var currentClef: Clef = .treble
     @Published public var currentNote: StaffNote = StaffNote(name: "", midi: 60)
 
+    // Optional externally-provided MIDI range to constrain randomization (e.g., from calibration)
+    private var allowedMIDIRange: ClosedRange<Int>? = nil
+
+    /// Provide an allowed MIDI range (inclusive) to constrain random note generation.
+    public func setAllowedMIDIRange(_ range: ClosedRange<Int>?) {
+        allowedMIDIRange = range
+    }
+
     public init() {}
 
     // MARK: - Public API
     public func randomizeNote() {
         currentClef = Bool.random() ? .treble : .bass
-        let range = midiRange(for: currentClef)
-        let candidates = Array(range).filter(isNatural)
+        let baseRange = midiRange(for: currentClef)
+        let effectiveRange: ClosedRange<Int>
+        if let allowed = allowedMIDIRange {
+            let lower = max(baseRange.lowerBound, allowed.lowerBound)
+            let upper = min(baseRange.upperBound, allowed.upperBound)
+            if lower <= upper {
+                effectiveRange = lower...upper
+            } else {
+                // If no overlap, fall back to baseRange to avoid empty candidates
+                effectiveRange = baseRange
+            }
+        } else {
+            effectiveRange = baseRange
+        }
+        let candidates = Array(effectiveRange).filter(isNatural)
         if let midi = candidates.randomElement() {
             currentNote = StaffNote(name: noteName(for: midi), midi: midi)
         }
