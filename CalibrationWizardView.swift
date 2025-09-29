@@ -1,3 +1,9 @@
+//
+//  CalibrationWizardView.swift
+//  MusicStaff-FontTest
+//
+//  Created by Chuck Condron on 9/29/25.
+//
 import SwiftUI
 
 private let kWizardNoteNames: [String] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]

@@ -1,3 +1,10 @@
+//
+//  StaffViewModel.swift
+//  MusicStaff-FontTest
+//
+//  Created by Chuck Condron on 9/20/25.
+//
+
 import SwiftUI
 import Combine
 
