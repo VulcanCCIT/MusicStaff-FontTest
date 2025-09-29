@@ -412,6 +412,16 @@ struct ContentView: View {
       vm.setAllowedMIDIRange(appData.calibratedRange)
       randomizeNoteRespectingCalibration()
     }
+    .onChange(of: conductor.data.noteOn) { newValue in
+      // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
+      guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
+      // If the played note matches the current target note, auto-advance to a new one
+      if newValue == vm.currentNote.midi {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+          randomizeNoteRespectingCalibration()
+        }
+      }
+    }
     .padding()
   }
   var midiReceivedIndicator: some View {
