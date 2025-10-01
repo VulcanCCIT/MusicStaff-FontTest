@@ -295,8 +295,9 @@ struct ContentView: View {
   var body: some View {
     VStack(spacing: 16) {
       midiReceivedIndicator
+      Spacer()
 
-      
+     //KeyBoardView()
       // Staff and note drawing
       Canvas { context, size in
         // Center the entire staff/note drawing within the canvas
@@ -363,6 +364,8 @@ struct ContentView: View {
       .frame(height: 420)
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
+     //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
+      KeyBoardView()
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -373,6 +376,7 @@ struct ContentView: View {
         Text("MIDI:")
         Text(String(vm.currentNote.midi)).monospaced()
       }
+      
       
       // Received values from MIDI to compare with the random note above
       HStack(spacing: 12) {
@@ -391,7 +395,7 @@ struct ContentView: View {
             .foregroundStyle((conductor.data.noteOn == vm.currentNote.midi) ? .green : .red)
         }
       }
-
+              
       // Button to get a new random note on a random clef (only one clef at a time)
       Button("New Note") {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
