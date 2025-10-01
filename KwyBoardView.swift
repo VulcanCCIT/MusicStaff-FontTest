@@ -32,6 +32,7 @@ let evenSpacingSpacerRatio: [Letter: CGFloat] = [
 let evenSpacingRelativeBlackKeyWidth: CGFloat = 7.0 / 12.0
 
 struct KeyBoardView: View {
+  @ObservedObject var conductor: MIDIMonitorConductor
   
   func noteOn(pitch: Pitch, point: CGPoint) {
     print("note on \(pitch)")
@@ -113,9 +114,11 @@ struct KeyBoardView: View {
           noteOn: noteOnWithVerticalVelocity(pitch:point:),
           noteOff: noteOff
         ) { pitch, isActivated in
+          let midi = pitch.intValue
+          let externallyOn = conductor.activeNotes.contains(midi)
           KeyboardKey(
             pitch: pitch,
-            isActivated: isActivated,
+            isActivated: isActivated || externallyOn,
             text: scientificLabel(for: pitch),
             //flatTop: true,
             alignment: .bottom
@@ -136,3 +139,4 @@ struct KeyBoardView: View {
 //  KeyBoardView()
 //    .environmentObject(data)
 //}
+

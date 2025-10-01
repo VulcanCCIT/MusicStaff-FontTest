@@ -42,6 +42,7 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     @Published var isToggleOn: Bool = false
     @Published var oldControllerValue: Int = 0
     @Published var midiEventType: MIDIEventType = .none
+    @Published var activeNotes = Set<Int>()
 
     init() {}
 
@@ -69,7 +70,11 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             self.data.noteOn = Int(noteNumber)
             self.data.velocity = Int(velocity)
             self.data.channel = Int(channel)
-            if self.data.velocity == 0 {
+            if velocity > 0 {
+                self.activeNotes.insert(Int(noteNumber))
+            } else {
+                // Treat Note On with velocity 0 as Note Off
+                self.activeNotes.remove(Int(noteNumber))
                 withAnimation(.easeOut(duration: 0.4)) {
                     self.isShowingMIDIReceived = false
                 }
@@ -91,6 +96,7 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             self.data.noteOff = Int(noteNumber)
             self.data.velocity = Int(velocity)
             self.data.channel = Int(channel)
+            self.activeNotes.remove(Int(noteNumber))
         }
     }
 
@@ -365,7 +371,7 @@ struct ContentView: View {
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
      //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
-      KeyBoardView()
+      KeyBoardView(conductor: conductor)
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -521,20 +527,20 @@ struct ContentView: View {
     let data = AppData()
     data.noteHeadStyle = .whole
     return ContentView()
-    .environmentObject(data).frame(width: 900, height: 600)
+    .environmentObject(data).frame(width: 900, height: 900)
 }
 
 #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
     return ContentView()
-        .environmentObject(data).frame(width: 900, height: 600)
+        .environmentObject(data).frame(width: 900, height: 900)
 }
 
 #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
     return ContentView()
-        .environmentObject(data).frame(width: 900, height: 600)
+        .environmentObject(data).frame(width: 900, height: 900)
 }
 
