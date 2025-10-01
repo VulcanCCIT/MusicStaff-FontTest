@@ -32,7 +32,7 @@ let evenSpacingSpacerRatio: [Letter: CGFloat] = [
 let evenSpacingRelativeBlackKeyWidth: CGFloat = 7.0 / 12.0
 
 struct KeyBoardView: View {
-  @ObservedObject var conductor: MIDIMonitorConductor
+  @EnvironmentObject private var conductor: MIDIMonitorConductor
   
   func noteOn(pitch: Pitch, point: CGPoint) {
     print("note on \(pitch)")
@@ -120,7 +120,6 @@ struct KeyBoardView: View {
             pitch: pitch,
             isActivated: isActivated || externallyOn,
             text: scientificLabel(for: pitch),
-            //flatTop: true,
             alignment: .bottom
           )
         }

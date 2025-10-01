@@ -10,11 +10,13 @@ import SwiftUI
 @main
 struct MusicStaff_FontTestApp: App {
     @StateObject private var appData = AppData()
+    @StateObject private var conductor = MIDIMonitorConductor()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appData)
+                .environmentObject(conductor)
         }
     }
 }

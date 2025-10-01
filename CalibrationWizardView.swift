@@ -17,9 +17,8 @@ private func midiNoteName(_ midi: Int) -> String {
 
 struct CalibrationWizardView: View {
     @EnvironmentObject private var appData: AppData
+    @EnvironmentObject private var conductor: MIDIMonitorConductor
     @Binding var isPresented: Bool
-
-    @StateObject private var conductor = MIDIMonitorConductor()
 
     private enum Step { case pressLowest, pressHighest, review }
     @State private var step: Step = .pressLowest
@@ -90,8 +89,6 @@ struct CalibrationWizardView: View {
             }
         }
         .padding()
-        .onAppear { conductor.start() }
-        .onDisappear { conductor.stop() }
         .onChange(of: conductor.data.noteOn) { _, newValue in
             guard newValue > 0 else { return }
             handleIncoming(note: newValue)

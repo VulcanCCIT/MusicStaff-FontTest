@@ -245,7 +245,7 @@ struct ContentView: View {
   let noteX: CGFloat = 166
 
   @StateObject private var vm = StaffViewModel()
-  @StateObject private var conductor = MIDIMonitorConductor()
+  @EnvironmentObject private var conductor: MIDIMonitorConductor
   @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
@@ -371,7 +371,7 @@ struct ContentView: View {
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
      //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
-      KeyBoardView(conductor: conductor)
+      KeyBoardView()
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -441,6 +441,7 @@ struct ContentView: View {
     }
     .onDisappear {
       advanceWorkItem?.cancel()
+      conductor.stop()
     }
     .padding()
   }
