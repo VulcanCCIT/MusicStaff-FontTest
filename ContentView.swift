@@ -399,6 +399,7 @@ struct ContentView: View {
         }
       }
       .buttonStyle(.borderedProminent)
+      Spacer()
     }//vstack
     .onAppear {
       vm.setAllowedMIDIRange(appData.calibratedRange)
@@ -516,20 +517,20 @@ struct ContentView: View {
     let data = AppData()
     data.noteHeadStyle = .whole
     return ContentView()
-        .environmentObject(data)
+    .environmentObject(data).frame(width: 900, height: 600)
 }
 
 #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
     return ContentView()
-        .environmentObject(data)
+        .environmentObject(data).frame(width: 900, height: 600)
 }
 
 #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
     return ContentView()
-        .environmentObject(data)
+        .environmentObject(data).frame(width: 900, height: 600)
 }
 
