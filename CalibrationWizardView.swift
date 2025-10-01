@@ -162,6 +162,8 @@ struct CalibrationWizardView: View {
 
 #Preview {
     let data = AppData()
+    let conductor = MIDIMonitorConductor()
     return CalibrationWizardView(isPresented: .constant(true))
         .environmentObject(data)
+        .environmentObject(conductor)
 }

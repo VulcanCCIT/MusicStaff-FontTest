@@ -528,20 +528,26 @@ struct ContentView: View {
     let data = AppData()
     data.noteHeadStyle = .whole
     return ContentView()
-    .environmentObject(data).frame(width: 900, height: 900)
+        .environmentObject(data)
+        .environmentObject(MIDIMonitorConductor())
+        .frame(width: 900, height: 900)
 }
 
 #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
     return ContentView()
-        .environmentObject(data).frame(width: 900, height: 900)
+        .environmentObject(data)
+        .environmentObject(MIDIMonitorConductor())
+        .frame(width: 900, height: 900)
 }
 
 #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
     return ContentView()
-        .environmentObject(data).frame(width: 900, height: 900)
+        .environmentObject(data)
+        .environmentObject(MIDIMonitorConductor())
+        .frame(width: 900, height: 900)
 }
 
