@@ -1,5 +1,5 @@
 //
-//  KwyBoardView.swift
+//  KeyBoardView.swift
 //  MusicStaff-FontTest
 //
 //  Created by Chuck Condron on 10/1/25.
@@ -65,9 +65,12 @@ class InstrumentEXSConductor: ObservableObject, HasAudioEngine {
         engine.output = instrument
         
         // Load EXS file (you can also load SoundFonts and WAV files too using the AppleSampler Class)
+      
+      //sawPiano1
         do {
             if let fileURL = Bundle.main.url(forResource: "Sounds/Sampler Instruments/sawPiano1", withExtension: "exs") {
                 try instrument.loadInstrument(url: fileURL)
+              Log("Loaded instrument Successfully!")
             } else {
                 Log("Could not find file")
             }
@@ -164,10 +167,10 @@ struct KeyBoardView: View {
               text: scientificLabel(for: pitch),
               alignment: .bottom
             )
-            Rectangle()
-              .fill(overlayColor)
-              .opacity(externalIntensity)
-              .allowsHitTesting(false)
+//            Rectangle()
+//              .fill(overlayColor)
+//              .opacity(externalIntensity)
+//              .allowsHitTesting(false)
           }
         }
                 .frame(minWidth: 100, minHeight: 100)
