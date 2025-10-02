@@ -249,8 +249,13 @@ struct ContentView: View {
   @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
+  @State private var feedbackMessage: String = "Waiting for note…"
+  @State private var feedbackColor: Color = .secondary
+
   @State private var showingCalibration = false
   @State private var showDebugOverlays = false
+
+  // Removed isWaitingForNote and receivedBlankDelay
 
   private var currentNoteSymbol: MusicSymbol {
     // Determine stem direction relative to the middle staff line
@@ -301,7 +306,7 @@ struct ContentView: View {
   var body: some View {
     VStack(spacing: 16) {
       midiReceivedIndicator
-      Spacer()
+     // Spacer()
 
      //KeyBoardView()
       // Staff and note drawing
@@ -367,7 +372,7 @@ struct ContentView: View {
         context.draw(noteText, at: notePoint, anchor: .center)
         
       }
-      .frame(height: 420)
+      .frame(height: 320) //was 420
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
      //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
@@ -391,16 +396,19 @@ struct ContentView: View {
         Text("Received Note:")
         Text(noteName(from: conductor.data.noteOn))
           .monospaced()
-          .foregroundColor(conductor.data.noteOn == 0 ? .secondary : (conductor.data.noteOn == vm.currentNote.midi ? .green : .red))
         Text("Received MIDI:")
         Text(String(conductor.data.noteOn))
           .monospaced()
-          .foregroundColor(conductor.data.noteOn == 0 ? .secondary : (conductor.data.noteOn == vm.currentNote.midi ? .green : .red))
-        if conductor.data.noteOn != 0 {
-          Image(systemName: (conductor.data.noteOn == vm.currentNote.midi) ? "checkmark.circle.fill" : "xmark.circle.fill")
-            .foregroundStyle((conductor.data.noteOn == vm.currentNote.midi) ? .green : .red)
-        }
+
+        //Text("Waiting for new note…")
+          //.foregroundStyle(.secondary)
       }
+
+      // Feedback banner for correctness (always visible)
+      Text(feedbackMessage)
+        .font(.title3.weight(.semibold))
+        .foregroundStyle(feedbackColor)
+        .padding(.top, 4)
               
       // Button to get a new random note on a random clef (only one clef at a time)
       Button("New Note") {
@@ -427,12 +435,27 @@ struct ContentView: View {
     .onChange(of: conductor.data.noteOn) { _, newValue in
       // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
       guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
-      // If the played note matches the current target note, schedule a debounced auto-advance
-      guard newValue == vm.currentNote.midi else { return }
-      // Cancel any pending advance and schedule a new one
+
+      // Show the received values briefly before switching to waiting state
+      let playedName = noteName(from: newValue)
+      let correct = (newValue == vm.currentNote.midi)
+
+      // Build feedback message and color
+      if correct {
+        feedbackMessage = "You played \(playedName). That is correct! Try the next note now."
+        feedbackColor = .green
+      } else {
+        feedbackMessage = "You played \(playedName). That is incorrect, try again."
+        feedbackColor = .red
+      }
+
+      // Auto-advance only if the played note matches the current target note
       advanceWorkItem?.cancel()
+      guard correct else { return }
+
       let work = DispatchWorkItem {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+          // Advance to the next target; keep last feedback visible
           randomizeNoteRespectingCalibration()
         }
       }
