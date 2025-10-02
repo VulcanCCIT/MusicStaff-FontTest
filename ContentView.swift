@@ -306,7 +306,7 @@ struct ContentView: View {
   var body: some View {
     VStack(spacing: 16) {
       midiReceivedIndicator
-      Spacer()
+     // Spacer()
 
      //KeyBoardView()
       // Staff and note drawing
@@ -372,7 +372,7 @@ struct ContentView: View {
         context.draw(noteText, at: notePoint, anchor: .center)
         
       }
-      .frame(height: 420)
+      .frame(height: 320) //was 420
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
      //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
