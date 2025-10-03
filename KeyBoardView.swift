@@ -111,7 +111,7 @@ struct KeyBoardView: View {
           let midi = pitch.intValue
           let externallyOn = conductor.activeNotes.contains(midi)
           //let externalIntensity = externalVelocities[midi] ?? 0.0
-          let isBlack = [1, 3, 6, 8, 10].contains(midi % 12)
+          //let isBlack = [1, 3, 6, 8, 10].contains(midi % 12)
           //let overlayColor: Color = isBlack ? .cyan : .blue
           ZStack {
             KeyboardKey(
