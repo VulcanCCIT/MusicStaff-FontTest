@@ -66,7 +66,7 @@ class InstrumentEXSConductor: ObservableObject, HasAudioEngine {
         
         // Load EXS file (you can also load SoundFonts and WAV files too using the AppleSampler Class)
       
-      //sawPiano1
+      //sawPiano1 Sounds/Sampler Instruments/yamahaC7
         do {
             if let fileURL = Bundle.main.url(forResource: "Sounds/Sampler Instruments/sawPiano1", withExtension: "exs") {
                 try instrument.loadInstrument(url: fileURL)
@@ -153,7 +153,7 @@ struct KeyBoardView: View {
         Keyboard(
           layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
           noteOn: exsConductor.noteOn(pitch:point:),
-          noteOff: exsConductor.noteOff(pitch:)
+          noteOff: exsConductor.noteOff(pitch:)          
         ) { pitch, isActivated in
           let midi = pitch.intValue
           let externallyOn = conductor.activeNotes.contains(midi)
