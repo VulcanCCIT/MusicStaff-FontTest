@@ -355,7 +355,7 @@ struct ContentView: View {
 
   @StateObject private var vm = StaffViewModel()
   @EnvironmentObject private var conductor: MIDIMonitorConductor
-  @State private var advanceWorkItem: DispatchWorkItem?
+  // Removed: @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
   @State private var feedbackMessage: String = "Waiting for note…"
@@ -558,21 +558,15 @@ struct ContentView: View {
         feedbackColor = .red
       }
 
-      // Auto-advance only if the played note matches the current target note
-      advanceWorkItem?.cancel()
+      // Auto-advance immediately if the played note matches the current target note
       guard correct else { return }
 
-      let work = DispatchWorkItem {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-          // Advance to the next target; keep last feedback visible
-          randomizeNoteRespectingCalibration()
-        }
+      withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+        // Advance to the next target; keep last feedback visible
+        randomizeNoteRespectingCalibration()
       }
-      advanceWorkItem = work
-      DispatchQueue.main.asyncAfter(deadline: .now() + appData.autoAdvanceDebounce, execute: work)
     }
     .onDisappear {
-      advanceWorkItem?.cancel()
       conductor.stop()
     }
     .padding()
@@ -608,29 +602,6 @@ struct ContentView: View {
 
           // Right-aligned controls
           HStack(spacing: 12) {
-              // Debounce control (label fixed width)
-              HStack(spacing: 6) {
-                  Image(systemName: "timer")
-                  .foregroundStyle(.blue)
-                      //.foregroundStyle(.secondary)
-                  Text("Debounce:")
-                  .font(.headline)
-                      .foregroundStyle(.blue)
-                      .frame(width: 70)
-                     // .padding(.trailing, 2)
-                  Picker("Debounce", selection: $appData.autoAdvanceDebounce) {
-                      Text("Off").tag(0.0)
-                      Text("0.15s").tag(0.15)
-                      Text("0.25s").tag(0.25)
-                      Text("0.5s").tag(0.5)
-                      Text("1.0s").tag(1.0)
-                  }
-                  .labelsHidden()
-                  .pickerStyle(.menu)
-                  .frame(width: 110)
-                  .help("Time to wait before auto-advancing after a correct note.")
-              }
-
               Text(calibrationDisplayText)
               .font(.headline)
                   .foregroundStyle(.blue)
