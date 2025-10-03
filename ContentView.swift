@@ -41,6 +41,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     let engine = AudioEngine()
     var instrument = AppleSampler()
     private var engineStarted = false
+
+    // Scale external MIDI velocities to match on-screen loudness
+    @Published var externalVelocityBoost: Double = 2.25
+
     @Published var data = MIDIMonitorData()
     @Published var isShowingMIDIReceived: Bool = false
     @Published var isToggleOn: Bool = false
@@ -104,8 +108,9 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         let note = Int(noteNumber)
         let vel  = Int(velocity)
         if vel > 0 {
-            instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(vel), channel: 0)
-            noteOnSubject.send((note, vel))
+            let boosted = min(127, Int(round(Double(vel) * externalVelocityBoost)))
+            instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(boosted), channel: 0)
+            noteOnSubject.send((note, boosted))
         } else {
             // Treat Note On with velocity 0 as Note Off
             instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
