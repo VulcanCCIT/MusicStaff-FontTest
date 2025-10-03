@@ -13,20 +13,26 @@ public typealias MIDI = Int
 public struct StaffNote {
     public let name: String
     public let midi: Int
+    public let accidental: String // "", "♯", or "♭" (based on note name)
 }
 
 public enum Clef { case treble, bass }
 
 public final class StaffViewModel: ObservableObject {
     @Published public var currentClef: Clef = .treble
-    @Published public var currentNote: StaffNote = StaffNote(name: "", midi: 60)
+    @Published public var currentNote: StaffNote = StaffNote(name: "", midi: 60, accidental: "")
 
     // Optional externally-provided MIDI range to constrain randomization (e.g., from calibration)
     private var allowedMIDIRange: ClosedRange<Int>? = nil
+    private var includeAccidentals: Bool = false
 
     /// Provide an allowed MIDI range (inclusive) to constrain random note generation.
     public func setAllowedMIDIRange(_ range: ClosedRange<Int>?) {
         allowedMIDIRange = range
+    }
+    
+    public func setIncludeAccidentals(_ include: Bool) {
+        includeAccidentals = include
     }
 
     public init() {}
@@ -48,9 +54,15 @@ public final class StaffViewModel: ObservableObject {
         } else {
             effectiveRange = baseRange
         }
-        let candidates = Array(effectiveRange).filter(isNatural)
+        let candidates: [Int]
+        if includeAccidentals {
+            candidates = Array(effectiveRange)
+        } else {
+            candidates = Array(effectiveRange).filter(isNatural)
+        }
         if let midi = candidates.randomElement() {
-            currentNote = StaffNote(name: noteName(for: midi), midi: midi)
+            let (disp, acc) = displayNameAndAccidental(for: midi)
+            currentNote = StaffNote(name: disp, midi: midi, accidental: acc)
         }
     }
 
@@ -193,5 +205,27 @@ public final class StaffViewModel: ObservableObject {
         } else {
             return []
         }
+    }
+    
+    private func displayNameAndAccidental(for midi: Int) -> (String, String) {
+        let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        let flatNames = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
+        let pc = midi % 12
+        let octave = midi / 12 - 1
+        let blackPCs: Set<Int> = [1, 3, 6, 8, 10]
+        let useSharps: Bool
+        if blackPCs.contains(pc) {
+            // Randomly choose between sharp and flat spellings for black keys
+            useSharps = Bool.random()
+        } else {
+            // Naturals are always their natural spelling
+            useSharps = true
+        }
+        let raw = useSharps ? names[pc] : flatNames[pc]
+        let acc: String
+        if raw.contains("#") { acc = "♯" }
+        else if raw.contains("b") { acc = "♭" }
+        else { acc = "" }
+        return (raw + String(octave), acc)
     }
 }

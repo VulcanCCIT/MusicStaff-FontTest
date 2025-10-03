@@ -56,29 +56,26 @@ final class AppData: ObservableObject {
 
     private static let noteHeadStyleKey = "noteHeadStyle"
 
-    // Auto-advance debounce (seconds)
-    @Published var autoAdvanceDebounce: Double {
+    @Published var includeAccidentals: Bool {
         didSet {
-            UserDefaults.standard.set(autoAdvanceDebounce, forKey: Self.autoAdvanceDebounceKey)
+            UserDefaults.standard.set(includeAccidentals, forKey: Self.includeAccidentalsKey)
         }
     }
 
-    private static let autoAdvanceDebounceKey = "autoAdvanceDebounce"
+    private static let includeAccidentalsKey = "includeAccidentals"
 
     init() {
         // Note head style
         let raw = UserDefaults.standard.string(forKey: Self.noteHeadStyleKey)
             ?? NoteHeadStyle.whole.rawValue
         self.noteHeadStyle = NoteHeadStyle(rawValue: raw) ?? .whole
+        self.includeAccidentals = UserDefaults.standard.object(forKey: Self.includeAccidentalsKey) as? Bool ?? false
 
         // Calibration defaults: full MIDI range unless previously set
         let savedMin = UserDefaults.standard.object(forKey: Self.minMIDINoteKey) as? Int
         let savedMax = UserDefaults.standard.object(forKey: Self.maxMIDINoteKey) as? Int
         self.minMIDINote = savedMin ?? 0
         self.maxMIDINote = savedMax ?? 127
-
-        // Auto-advance debounce
-        let savedDebounce = UserDefaults.standard.object(forKey: Self.autoAdvanceDebounceKey) as? Double
-        self.autoAdvanceDebounce = savedDebounce ?? 0.25
     }
 }
+

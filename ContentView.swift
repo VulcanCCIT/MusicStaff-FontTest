@@ -37,23 +37,65 @@ enum MIDIEventType {
 
 class MIDIMonitorConductor: ObservableObject, MIDIListener {
     let midi = AudioKit.MIDI()
+    // Audio engine and instrument (Option B)
+    let engine = AudioEngine()
+    var instrument = AppleSampler()
+    private var engineStarted = false
+
+    // Scale external MIDI velocities to match on-screen loudness
+    @Published var externalVelocityBoost: Double = 2.25
+
     @Published var data = MIDIMonitorData()
     @Published var isShowingMIDIReceived: Bool = false
     @Published var isToggleOn: Bool = false
     @Published var oldControllerValue: Int = 0
     @Published var midiEventType: MIDIEventType = .none
     @Published var activeNotes = Set<Int>()
+    @Published var noteOnEventID = UUID()
+    @Published var lastEventWasSimulated: Bool = false
 
-    init() {}
+    // Per-event publishers (Option A): emit exact payloads for immediate handling
+    let noteOnSubject = PassthroughSubject<(Int, Int), Never>()
+    let noteOffSubject = PassthroughSubject<Int, Never>()
+
+    init() {
+        // Configure audio chain
+        engine.output = instrument
+        // Try loading the instrument (SoundFont)
+        do {
+            if let url = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
+                try instrument.loadInstrument(url: url)
+                Log("Loaded instrument Successfully!")
+            } else {
+                Log("Could not find file")
+            }
+        } catch {
+            Log("Could not load instrument")
+        }
+    }
 
     func start() {
         midi.openInput(name: "Bluetooth")
         midi.openInput()
         midi.addListener(self)
+
+        if !engineStarted {
+            do {
+                try engine.start()
+                engineStarted = true
+            } catch {
+                Log("Audio engine failed to start: \(error.localizedDescription)")
+            }
+        }
     }
 
     func stop() {
         midi.closeAllInputs()
+
+        if engineStarted {
+            engine.stop()
+            engineStarted = false
+        }
     }
 
     func receivedMIDINoteOn(noteNumber: MIDINoteNumber,
@@ -62,10 +104,26 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
                             portID _: MIDIUniqueID?,
                             timeStamp _: MIDITimeStamp?)
     {
-        print("noteNumber \(noteNumber) \(noteNumber)")
-        print("velocity \(velocity) \(velocity)")
+        // Trigger audio immediately and emit payload (avoid SwiftUI state coalescing)
+        let note = Int(noteNumber)
+        let vel  = Int(velocity)
+        if vel > 0 {
+            let boosted = min(127, Int(round(Double(vel) * externalVelocityBoost)))
+            instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(boosted), channel: 0)
+            DispatchQueue.main.async {
+                self.noteOnSubject.send((note, boosted))
+            }
+        } else {
+            // Treat Note On with velocity 0 as Note Off
+            instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
+            DispatchQueue.main.async {
+                self.noteOffSubject.send(note)
+            }
+        }
         DispatchQueue.main.async {
+            self.lastEventWasSimulated = false
             self.midiEventType = .noteOn
+            self.noteOnEventID = UUID()
             self.isShowingMIDIReceived = true
             self.data.noteOn = Int(noteNumber)
             self.data.velocity = Int(velocity)
@@ -88,9 +146,14 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
                              portID _: MIDIUniqueID?,
                              timeStamp _: MIDITimeStamp?)
     {
-        print("noteNumber \(noteNumber) \(noteNumber)")
-        print("velocity \(velocity) \(velocity)")
+        // Trigger audio immediately and emit payload
+        let note = Int(noteNumber)
+        instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
         DispatchQueue.main.async {
+            self.noteOffSubject.send(note)
+        }
+        DispatchQueue.main.async {
+            self.lastEventWasSimulated = false
             self.midiEventType = .noteOff
             self.isShowingMIDIReceived = false
             self.data.noteOff = Int(noteNumber)
@@ -214,6 +277,52 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     func receivedMIDINotification(notification _: MIDINotification) {
         // Do nothing
     }
+
+    // MARK: - Simulated events for on-screen keyboard
+    func simulateNoteOn(noteNumber: Int, velocity: Int, channel: Int = 0) {
+        // Trigger audio immediately and emit payload
+        instrument.play(noteNumber: MIDINoteNumber(noteNumber), velocity: MIDIVelocity(velocity), channel: 0)
+        DispatchQueue.main.async {
+            self.noteOnSubject.send((noteNumber, velocity))
+        }
+
+        DispatchQueue.main.async {
+            self.lastEventWasSimulated = true
+            self.noteOnEventID = UUID()
+            self.midiEventType = .noteOn
+            self.isShowingMIDIReceived = true
+            self.data.noteOn = noteNumber
+            self.data.velocity = velocity
+            self.data.channel = channel
+            if velocity > 0 {
+                self.activeNotes.insert(noteNumber)
+            } else {
+                // Treat Note On with velocity 0 as Note Off
+                self.activeNotes.remove(noteNumber)
+                withAnimation(.easeOut(duration: 0.4)) {
+                    self.isShowingMIDIReceived = false
+                }
+            }
+        }
+    }
+
+    func simulateNoteOff(noteNumber: Int, velocity: Int = 0, channel: Int = 0) {
+        // Trigger audio immediately and emit payload
+        instrument.stop(noteNumber: MIDINoteNumber(noteNumber), channel: 0)
+        DispatchQueue.main.async {
+            self.noteOffSubject.send(noteNumber)
+        }
+
+        DispatchQueue.main.async {
+            self.lastEventWasSimulated = true
+            self.midiEventType = .noteOff
+            self.isShowingMIDIReceived = false
+            self.data.noteOff = noteNumber
+            self.data.velocity = velocity
+            self.data.channel = channel
+            self.activeNotes.remove(noteNumber)
+        }
+    }
 }
 
 
@@ -240,13 +349,17 @@ struct ContentView: View {
   let sevenLine = MusicSymbol.sevenLine.text()
   let eightLine = MusicSymbol.eightLine.text()
   let nineLine = MusicSymbol.nineLine.text()
+  
+  let sharpText = MusicSymbol.sharpSymbol.text()
+  let flatText = MusicSymbol.flatSymbol.text()
+  let naturalText = MusicSymbol.naturalSymbol.text()
 
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
 
   @StateObject private var vm = StaffViewModel()
   @EnvironmentObject private var conductor: MIDIMonitorConductor
-  @State private var advanceWorkItem: DispatchWorkItem?
+  // Removed: @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
 
   @State private var feedbackMessage: String = "Waiting for note…"
@@ -366,9 +479,20 @@ struct ContentView: View {
           context.stroke(p, with: .color(.primary), lineWidth: strokeWidth)
         }
 
-        // Draw the current note
+        // Draw accidental if needed just to the left of the note
+        let acc = vm.currentNote.accidental
         let notePoint = CGPoint(x: noteX, y: vm.currentY)
         let noteText = currentNoteSymbol.text()
+        if acc == "♯" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(sharpText, at: accPoint, anchor: .center)
+        } else if acc == "♭" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(flatText, at: accPoint, anchor: .center)
+        } else if acc == "♮" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(naturalText, at: accPoint, anchor: .center)
+        }
         context.draw(noteText, at: notePoint, anchor: .center)
         
       }
@@ -421,6 +545,7 @@ struct ContentView: View {
     }//vstack
     .onAppear {
       vm.setAllowedMIDIRange(appData.calibratedRange)
+      vm.setIncludeAccidentals(appData.includeAccidentals)
       randomizeNoteRespectingCalibration()
       conductor.start()
     }
@@ -430,6 +555,10 @@ struct ContentView: View {
     }
     .onChange(of: appData.maxMIDINote) { _, _ in
       vm.setAllowedMIDIRange(appData.calibratedRange)
+      randomizeNoteRespectingCalibration()
+    }
+    .onChange(of: appData.includeAccidentals) { _, newValue in
+      vm.setIncludeAccidentals(newValue)
       randomizeNoteRespectingCalibration()
     }
     .onChange(of: conductor.data.noteOn) { _, newValue in
@@ -449,21 +578,15 @@ struct ContentView: View {
         feedbackColor = .red
       }
 
-      // Auto-advance only if the played note matches the current target note
-      advanceWorkItem?.cancel()
+      // Auto-advance immediately if the played note matches the current target note
       guard correct else { return }
 
-      let work = DispatchWorkItem {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-          // Advance to the next target; keep last feedback visible
-          randomizeNoteRespectingCalibration()
-        }
+      withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+        // Advance to the next target; keep last feedback visible
+        randomizeNoteRespectingCalibration()
       }
-      advanceWorkItem = work
-      DispatchQueue.main.asyncAfter(deadline: .now() + appData.autoAdvanceDebounce, execute: work)
     }
     .onDisappear {
-      advanceWorkItem?.cancel()
       conductor.stop()
     }
     .padding()
@@ -493,35 +616,15 @@ struct ContentView: View {
               .labelsHidden()
               .pickerStyle(.segmented)
               .frame(width: 320)
+              Divider().frame(height: 20)
+              Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
+                  .toggleStyle(.checkbox)
           }
 
           Spacer()
 
           // Right-aligned controls
           HStack(spacing: 12) {
-              // Debounce control (label fixed width)
-              HStack(spacing: 6) {
-                  Image(systemName: "timer")
-                  .foregroundStyle(.blue)
-                      //.foregroundStyle(.secondary)
-                  Text("Debounce:")
-                  .font(.headline)
-                      .foregroundStyle(.blue)
-                      .frame(width: 70)
-                     // .padding(.trailing, 2)
-                  Picker("Debounce", selection: $appData.autoAdvanceDebounce) {
-                      Text("Off").tag(0.0)
-                      Text("0.15s").tag(0.15)
-                      Text("0.25s").tag(0.25)
-                      Text("0.5s").tag(0.5)
-                      Text("1.0s").tag(1.0)
-                  }
-                  .labelsHidden()
-                  .pickerStyle(.menu)
-                  .frame(width: 110)
-                  .help("Time to wait before auto-advancing after a correct note.")
-              }
-
               Text(calibrationDisplayText)
               .font(.headline)
                   .foregroundStyle(.blue)
