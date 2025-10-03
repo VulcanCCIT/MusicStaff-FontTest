@@ -152,8 +152,20 @@ struct KeyBoardView: View {
 //                         noteOn: noteOnWithVerticalVelocity(pitch:point:), noteOff: noteOff)
         Keyboard(
           layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
-          noteOn: exsConductor.noteOn(pitch:point:),
-          noteOff: exsConductor.noteOff(pitch:)          
+          noteOn: { pitch, point in
+            // Play the sampler with vertical-velocity mapping
+            exsConductor.noteOn(pitch: pitch, point: point)
+            // Map vertical position to MIDI velocity and notify conductor
+            let raw = Int(point.y * 127)
+            let vel = max(1, min(127, raw))
+            conductor.simulateNoteOn(noteNumber: pitch.intValue, velocity: vel)
+          },
+          noteOff: { pitch in
+            // Stop the sampler
+            exsConductor.noteOff(pitch: pitch)
+            // Notify conductor of note off
+            conductor.simulateNoteOff(noteNumber: pitch.intValue)
+          }
         ) { pitch, isActivated in
           let midi = pitch.intValue
           let externallyOn = conductor.activeNotes.contains(midi)
@@ -179,12 +191,15 @@ struct KeyBoardView: View {
                           Color.clear : Color(red: 0.9, green: 0.9, blue: 0.9))
               .onAppear { exsConductor.start() }
               .onDisappear { exsConductor.stop() }
-              .onChange(of: conductor.data.noteOn) { _, newValue in
-                  // Respond to external MIDI Note On. Some devices send Note On with velocity 0 as Note Off
-                  guard conductor.midiEventType == .noteOn else { return }
+              .onChange(of: conductor.noteOnEventID) { _, _ in
+                  // Respond to external MIDI Note On via event ID (fires even when the same key repeats)
+                  guard conductor.midiEventType == .noteOn, conductor.lastEventWasSimulated == false else { return }
+                  let newValue = conductor.data.noteOn
                   if conductor.data.velocity > 0 {
-                      exsConductor.noteOn(midiNote: newValue, velocity: conductor.data.velocity)
-                      let norm = max(0.0, min(1.0, Double(conductor.data.velocity) / 127.0))
+                      // Optional: boost external MIDI velocity slightly to match on-screen loudness
+                      let boosted = min(127, Int(round(Double(conductor.data.velocity) * 2.25)))
+                      exsConductor.noteOn(midiNote: newValue, velocity: boosted)
+                      let norm = max(0.0, min(1.0, Double(boosted) / 127.0))
                       externalVelocities[newValue] = norm
                   } else {
                       exsConductor.noteOff(midiNote: newValue)
@@ -193,7 +208,7 @@ struct KeyBoardView: View {
               }
               .onChange(of: conductor.data.noteOff) { _, newValue in
                   // Respond to external MIDI Note Off
-                  guard conductor.midiEventType == .noteOff else { return }
+                  guard conductor.midiEventType == .noteOff, conductor.lastEventWasSimulated == false else { return }
                   exsConductor.noteOff(midiNote: newValue)
                   externalVelocities.removeValue(forKey: newValue)
               }

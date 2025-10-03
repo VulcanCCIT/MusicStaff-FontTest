@@ -43,6 +43,8 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     @Published var oldControllerValue: Int = 0
     @Published var midiEventType: MIDIEventType = .none
     @Published var activeNotes = Set<Int>()
+    @Published var noteOnEventID = UUID()
+    @Published var lastEventWasSimulated: Bool = false
 
     init() {}
 
@@ -65,7 +67,9 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         print("noteNumber \(noteNumber) \(noteNumber)")
         print("velocity \(velocity) \(velocity)")
         DispatchQueue.main.async {
+            self.lastEventWasSimulated = false
             self.midiEventType = .noteOn
+            self.noteOnEventID = UUID()
             self.isShowingMIDIReceived = true
             self.data.noteOn = Int(noteNumber)
             self.data.velocity = Int(velocity)
@@ -91,6 +95,7 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         print("noteNumber \(noteNumber) \(noteNumber)")
         print("velocity \(velocity) \(velocity)")
         DispatchQueue.main.async {
+            self.lastEventWasSimulated = false
             self.midiEventType = .noteOff
             self.isShowingMIDIReceived = false
             self.data.noteOff = Int(noteNumber)
@@ -213,6 +218,40 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
 
     func receivedMIDINotification(notification _: MIDINotification) {
         // Do nothing
+    }
+
+    // MARK: - Simulated events for on-screen keyboard
+    func simulateNoteOn(noteNumber: Int, velocity: Int, channel: Int = 0) {
+        DispatchQueue.main.async {
+            self.lastEventWasSimulated = true
+            self.noteOnEventID = UUID()
+            self.midiEventType = .noteOn
+            self.isShowingMIDIReceived = true
+            self.data.noteOn = noteNumber
+            self.data.velocity = velocity
+            self.data.channel = channel
+            if velocity > 0 {
+                self.activeNotes.insert(noteNumber)
+            } else {
+                // Treat Note On with velocity 0 as Note Off
+                self.activeNotes.remove(noteNumber)
+                withAnimation(.easeOut(duration: 0.4)) {
+                    self.isShowingMIDIReceived = false
+                }
+            }
+        }
+    }
+
+    func simulateNoteOff(noteNumber: Int, velocity: Int = 0, channel: Int = 0) {
+        DispatchQueue.main.async {
+            self.lastEventWasSimulated = true
+            self.midiEventType = .noteOff
+            self.isShowingMIDIReceived = false
+            self.data.noteOff = noteNumber
+            self.data.velocity = velocity
+            self.data.channel = channel
+            self.activeNotes.remove(noteNumber)
+        }
     }
 }
 
