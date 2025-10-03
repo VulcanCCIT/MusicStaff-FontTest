@@ -349,6 +349,10 @@ struct ContentView: View {
   let sevenLine = MusicSymbol.sevenLine.text()
   let eightLine = MusicSymbol.eightLine.text()
   let nineLine = MusicSymbol.nineLine.text()
+  
+  let sharpText = MusicSymbol.sharpSymbol.text()
+  let flatText = MusicSymbol.flatSymbol.text()
+  let naturalText = MusicSymbol.naturalSymbol.text()
 
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
@@ -475,9 +479,20 @@ struct ContentView: View {
           context.stroke(p, with: .color(.primary), lineWidth: strokeWidth)
         }
 
-        // Draw the current note
+        // Draw accidental if needed just to the left of the note
+        let acc = vm.currentNote.accidental
         let notePoint = CGPoint(x: noteX, y: vm.currentY)
         let noteText = currentNoteSymbol.text()
+        if acc == "♯" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(sharpText, at: accPoint, anchor: .center)
+        } else if acc == "♭" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(flatText, at: accPoint, anchor: .center)
+        } else if acc == "♮" {
+          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+          context.draw(naturalText, at: accPoint, anchor: .center)
+        }
         context.draw(noteText, at: notePoint, anchor: .center)
         
       }
@@ -530,6 +545,7 @@ struct ContentView: View {
     }//vstack
     .onAppear {
       vm.setAllowedMIDIRange(appData.calibratedRange)
+      vm.setIncludeAccidentals(appData.includeAccidentals)
       randomizeNoteRespectingCalibration()
       conductor.start()
     }
@@ -539,6 +555,10 @@ struct ContentView: View {
     }
     .onChange(of: appData.maxMIDINote) { _, _ in
       vm.setAllowedMIDIRange(appData.calibratedRange)
+      randomizeNoteRespectingCalibration()
+    }
+    .onChange(of: appData.includeAccidentals) { _, newValue in
+      vm.setIncludeAccidentals(newValue)
       randomizeNoteRespectingCalibration()
     }
     .onChange(of: conductor.data.noteOn) { _, newValue in
@@ -596,6 +616,9 @@ struct ContentView: View {
               .labelsHidden()
               .pickerStyle(.segmented)
               .frame(width: 320)
+              Divider().frame(height: 20)
+              Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
+                  .toggleStyle(.checkbox)
           }
 
           Spacer()

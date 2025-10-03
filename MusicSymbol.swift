@@ -24,6 +24,9 @@ enum MusicSymbol {
   case halfNoteDown
   case quarterNoteUP
   case quarterNoteDown
+  case sharpSymbol
+  case naturalSymbol
+  case flatSymbol
   
 
   var codepoint: String {
@@ -60,7 +63,12 @@ enum MusicSymbol {
         return "\u{E1D5}"
       case .quarterNoteDown:
         return "\u{E1D6}"
-        
+      case .flatSymbol:
+        return "\u{266D}"
+      case .naturalSymbol:
+        return "\u{266E}"
+      case .sharpSymbol:
+        return "\u{266F}"
   }
   }
 
@@ -68,7 +76,7 @@ enum MusicSymbol {
     switch self {
       case .bassStaff, .trebleStaff:
       return "MusGlyphs"
-      case .singleLine, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown:
+      case .singleLine, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown, .flatSymbol, .naturalSymbol, .sharpSymbol:
       return "Bravura"
     }
   }
@@ -79,7 +87,7 @@ enum MusicSymbol {
       return 70 //was 60
     case .singleLine:
       return 30
-      case .wholeNote, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown:
+      case .wholeNote, .doubleLine, .tripleLine, .quadLine, .quinLine, .sextLine, .sevenLine, .eightLine, .nineLine, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown, .flatSymbol, .naturalSymbol, .sharpSymbol:
       return 40
     }
   }

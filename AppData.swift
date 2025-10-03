@@ -56,11 +56,20 @@ final class AppData: ObservableObject {
 
     private static let noteHeadStyleKey = "noteHeadStyle"
 
+    @Published var includeAccidentals: Bool {
+        didSet {
+            UserDefaults.standard.set(includeAccidentals, forKey: Self.includeAccidentalsKey)
+        }
+    }
+
+    private static let includeAccidentalsKey = "includeAccidentals"
+
     init() {
         // Note head style
         let raw = UserDefaults.standard.string(forKey: Self.noteHeadStyleKey)
             ?? NoteHeadStyle.whole.rawValue
         self.noteHeadStyle = NoteHeadStyle(rawValue: raw) ?? .whole
+        self.includeAccidentals = UserDefaults.standard.object(forKey: Self.includeAccidentalsKey) as? Bool ?? false
 
         // Calibration defaults: full MIDI range unless previously set
         let savedMin = UserDefaults.standard.object(forKey: Self.minMIDINoteKey) as? Int
@@ -69,3 +78,4 @@ final class AppData: ObservableObject {
         self.maxMIDINote = savedMax ?? 127
     }
 }
+
