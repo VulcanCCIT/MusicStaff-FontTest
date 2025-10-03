@@ -66,9 +66,9 @@ class InstrumentEXSConductor: ObservableObject, HasAudioEngine {
         
         // Load EXS file (you can also load SoundFonts and WAV files too using the AppleSampler Class)
       
-      //sawPiano1 Sounds/Sampler Instruments/yamahaC7
+      //sawPiano1 Sounds/Sampler Instruments/yamahaC7 exs
         do {
-            if let fileURL = Bundle.main.url(forResource: "Sounds/Sampler Instruments/sawPiano1", withExtension: "exs") {
+            if let fileURL = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
                 try instrument.loadInstrument(url: fileURL)
               Log("Loaded instrument Successfully!")
             } else {
