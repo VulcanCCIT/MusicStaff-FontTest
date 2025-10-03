@@ -110,11 +110,15 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         if vel > 0 {
             let boosted = min(127, Int(round(Double(vel) * externalVelocityBoost)))
             instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(boosted), channel: 0)
-            noteOnSubject.send((note, boosted))
+            DispatchQueue.main.async {
+                self.noteOnSubject.send((note, boosted))
+            }
         } else {
             // Treat Note On with velocity 0 as Note Off
             instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
-            noteOffSubject.send(note)
+            DispatchQueue.main.async {
+                self.noteOffSubject.send(note)
+            }
         }
         DispatchQueue.main.async {
             self.lastEventWasSimulated = false
@@ -145,7 +149,9 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         // Trigger audio immediately and emit payload
         let note = Int(noteNumber)
         instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
-        noteOffSubject.send(note)
+        DispatchQueue.main.async {
+            self.noteOffSubject.send(note)
+        }
         DispatchQueue.main.async {
             self.lastEventWasSimulated = false
             self.midiEventType = .noteOff
@@ -276,7 +282,9 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     func simulateNoteOn(noteNumber: Int, velocity: Int, channel: Int = 0) {
         // Trigger audio immediately and emit payload
         instrument.play(noteNumber: MIDINoteNumber(noteNumber), velocity: MIDIVelocity(velocity), channel: 0)
-        noteOnSubject.send((noteNumber, velocity))
+        DispatchQueue.main.async {
+            self.noteOnSubject.send((noteNumber, velocity))
+        }
 
         DispatchQueue.main.async {
             self.lastEventWasSimulated = true
@@ -301,7 +309,9 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     func simulateNoteOff(noteNumber: Int, velocity: Int = 0, channel: Int = 0) {
         // Trigger audio immediately and emit payload
         instrument.stop(noteNumber: MIDINoteNumber(noteNumber), channel: 0)
-        noteOffSubject.send(noteNumber)
+        DispatchQueue.main.async {
+            self.noteOffSubject.send(noteNumber)
+        }
 
         DispatchQueue.main.async {
             self.lastEventWasSimulated = true
