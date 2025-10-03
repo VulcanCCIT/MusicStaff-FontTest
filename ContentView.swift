@@ -37,6 +37,10 @@ enum MIDIEventType {
 
 class MIDIMonitorConductor: ObservableObject, MIDIListener {
     let midi = AudioKit.MIDI()
+    // Audio engine and instrument (Option B)
+    let engine = AudioEngine()
+    var instrument = AppleSampler()
+    private var engineStarted = false
     @Published var data = MIDIMonitorData()
     @Published var isShowingMIDIReceived: Bool = false
     @Published var isToggleOn: Bool = false
@@ -46,16 +50,48 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     @Published var noteOnEventID = UUID()
     @Published var lastEventWasSimulated: Bool = false
 
-    init() {}
+    // Per-event publishers (Option A): emit exact payloads for immediate handling
+    let noteOnSubject = PassthroughSubject<(Int, Int), Never>()
+    let noteOffSubject = PassthroughSubject<Int, Never>()
+
+    init() {
+        // Configure audio chain
+        engine.output = instrument
+        // Try loading the instrument (SoundFont)
+        do {
+            if let url = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
+                try instrument.loadInstrument(url: url)
+                Log("Loaded instrument Successfully!")
+            } else {
+                Log("Could not find file")
+            }
+        } catch {
+            Log("Could not load instrument")
+        }
+    }
 
     func start() {
         midi.openInput(name: "Bluetooth")
         midi.openInput()
         midi.addListener(self)
+
+        if !engineStarted {
+            do {
+                try engine.start()
+                engineStarted = true
+            } catch {
+                Log("Audio engine failed to start: \(error.localizedDescription)")
+            }
+        }
     }
 
     func stop() {
         midi.closeAllInputs()
+
+        if engineStarted {
+            engine.stop()
+            engineStarted = false
+        }
     }
 
     func receivedMIDINoteOn(noteNumber: MIDINoteNumber,
@@ -64,8 +100,17 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
                             portID _: MIDIUniqueID?,
                             timeStamp _: MIDITimeStamp?)
     {
-        print("noteNumber \(noteNumber) \(noteNumber)")
-        print("velocity \(velocity) \(velocity)")
+        // Trigger audio immediately and emit payload (avoid SwiftUI state coalescing)
+        let note = Int(noteNumber)
+        let vel  = Int(velocity)
+        if vel > 0 {
+            instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(vel), channel: 0)
+            noteOnSubject.send((note, vel))
+        } else {
+            // Treat Note On with velocity 0 as Note Off
+            instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
+            noteOffSubject.send(note)
+        }
         DispatchQueue.main.async {
             self.lastEventWasSimulated = false
             self.midiEventType = .noteOn
@@ -92,8 +137,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
                              portID _: MIDIUniqueID?,
                              timeStamp _: MIDITimeStamp?)
     {
-        print("noteNumber \(noteNumber) \(noteNumber)")
-        print("velocity \(velocity) \(velocity)")
+        // Trigger audio immediately and emit payload
+        let note = Int(noteNumber)
+        instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
+        noteOffSubject.send(note)
         DispatchQueue.main.async {
             self.lastEventWasSimulated = false
             self.midiEventType = .noteOff
@@ -222,6 +269,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
 
     // MARK: - Simulated events for on-screen keyboard
     func simulateNoteOn(noteNumber: Int, velocity: Int, channel: Int = 0) {
+        // Trigger audio immediately and emit payload
+        instrument.play(noteNumber: MIDINoteNumber(noteNumber), velocity: MIDIVelocity(velocity), channel: 0)
+        noteOnSubject.send((noteNumber, velocity))
+
         DispatchQueue.main.async {
             self.lastEventWasSimulated = true
             self.noteOnEventID = UUID()
@@ -243,6 +294,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     }
 
     func simulateNoteOff(noteNumber: Int, velocity: Int = 0, channel: Int = 0) {
+        // Trigger audio immediately and emit payload
+        instrument.stop(noteNumber: MIDINoteNumber(noteNumber), channel: 0)
+        noteOffSubject.send(noteNumber)
+
         DispatchQueue.main.async {
             self.lastEventWasSimulated = true
             self.midiEventType = .noteOff
