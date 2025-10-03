@@ -212,18 +212,20 @@ public final class StaffViewModel: ObservableObject {
         let flatNames = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
         let pc = midi % 12
         let octave = midi / 12 - 1
-        let useSharps = sharpPreferred(pc: pc)
+        let blackPCs: Set<Int> = [1, 3, 6, 8, 10]
+        let useSharps: Bool
+        if blackPCs.contains(pc) {
+            // Randomly choose between sharp and flat spellings for black keys
+            useSharps = Bool.random()
+        } else {
+            // Naturals are always their natural spelling
+            useSharps = true
+        }
         let raw = useSharps ? names[pc] : flatNames[pc]
         let acc: String
         if raw.contains("#") { acc = "♯" }
         else if raw.contains("b") { acc = "♭" }
         else { acc = "" }
         return (raw + String(octave), acc)
-    }
-
-    private func sharpPreferred(pc: Int) -> Bool {
-        // Prefer sharps for keys commonly used in treble range; this is a simple heuristic.
-        // For this app we don't have a key context, so choose sharps for pitch classes that are commonly spelled with sharps.
-        return [1, 3, 6, 8, 10].contains(pc) // C#, D#, F#, G#, A#
     }
 }

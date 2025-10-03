@@ -64,11 +64,11 @@ enum MusicSymbol {
       case .quarterNoteDown:
         return "\u{E1D6}"
       case .flatSymbol:
-        return "\u{266D}"
+        return "\u{E260}"
       case .naturalSymbol:
-        return "\u{266E}"
+        return "\u{E261}"
       case .sharpSymbol:
-        return "\u{266F}"
+        return "\u{E262}"
   }
   }
 
@@ -96,3 +96,4 @@ enum MusicSymbol {
     Text(codepoint).font(.custom(fontName, size: size ?? defaultSize))
   }
 }
+
