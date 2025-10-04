@@ -615,7 +615,7 @@ struct ContentView: View {
               }
               .labelsHidden()
               .pickerStyle(.segmented)
-              .frame(width: 320)
+              .frame(width: 200)
               Divider().frame(height: 20)
               Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
                   .toggleStyle(.checkbox)
