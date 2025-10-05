@@ -340,15 +340,6 @@ struct ContentView: View {
 
   let trebleStaff = MusicSymbol.trebleStaff.text()
   let bassStaff = MusicSymbol.bassStaff.text()
-  let singleLine = MusicSymbol.singleLine.text()
-  let doubleLine = MusicSymbol.doubleLine.text()
-  let tripleLine = MusicSymbol.tripleLine.text()
-  let quadLine = MusicSymbol.quadLine.text()
-  let quinLine = MusicSymbol.quinLine.text()
-  let sextLine = MusicSymbol.sextLine.text()
-  let sevenLine = MusicSymbol.sevenLine.text()
-  let eightLine = MusicSymbol.eightLine.text()
-  let nineLine = MusicSymbol.nineLine.text()
   
   let sharpText = MusicSymbol.sharpSymbol.text()
   let flatText = MusicSymbol.flatSymbol.text()
