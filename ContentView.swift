@@ -608,12 +608,19 @@ struct ContentView: View {
               .pickerStyle(.segmented)
               .frame(width: 200)
               Divider().frame(height: 20)
+#if os(macOS)
               Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
-              #if os(macOS)
                   .toggleStyle(.checkbox)
-              #else
-                  .toggleStyle(.switch)
-              #endif
+#else
+              HStack(spacing: 6) {
+                  Text("Sharps/Flats")
+                  Toggle("", isOn: $appData.includeAccidentals)
+                      .labelsHidden()
+                      .toggleStyle(.switch)
+                      .controlSize(.small)
+                      .accessibilityLabel("Sharps/Flats")
+              }
+#endif
           }
 
           Spacer()
@@ -621,10 +628,10 @@ struct ContentView: View {
           // Right-aligned controls
           HStack(spacing: 12) {
               Text(calibrationDisplayText)
-              .font(.headline)
+              .font(.subheadline)
                   .foregroundStyle(.blue)
                   //.lineLimit(1)
-                  .frame(width: 110)
+                  .frame(width: 130)
 
               Button("Calibrate") { showingCalibration = true }
                   .buttonStyle(.bordered)
@@ -671,4 +678,5 @@ struct ContentView: View {
         .environmentObject(MIDIMonitorConductor())
         .frame(width: 900, height: 900)
 }
+
 

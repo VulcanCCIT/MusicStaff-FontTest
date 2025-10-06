@@ -84,18 +84,19 @@ struct KeyBoardView: View {
     HStack {
       VStack {
         
-        // Display the current low note here
-        Text("Lowest Note: \(noteName(from: lowNote)) (MIDI: \(lowNote))")
-          .font(.headline)
-        
-        // Display the current high note here
-        Text("Highest Note: \(noteName(from: highNote)) (MIDI: \(highNote))")
-          .font(.headline)
+//        // Display the current low note here
+//        Text("Lowest Note: \(noteName(from: lowNote)) (MIDI: \(lowNote))")
+//          .font(.headline)
+//        
+//        // Display the current high note here
+//        Text("Highest Note: \(noteName(from: highNote)) (MIDI: \(highNote))")
+//          .font(.headline)
         
         
 //                Keyboard(layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
 //                         noteOn: noteOnWithVerticalVelocity(pitch:point:), noteOff: noteOff)
-        Keyboard(
+        // Blue indicator bar above the keys
+         Keyboard(
           layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
           noteOn: { pitch, point in
             // Map vertical position to MIDI velocity and notify conductor (audio is triggered in conductor)
@@ -127,9 +128,17 @@ struct KeyBoardView: View {
           }
         }
                 .frame(minWidth: 100, minHeight: 100)
+                .overlay(alignment: .top) {
+                  Rectangle()
+                    .fill(Color.blue)
+                    .frame(height: 10)
+                    .cornerRadius(3)
+                    //.padding(.horizontal, 6)
+                    .allowsHitTesting(false)
+                }
               }
-              .background(colorScheme == .dark ?
-                          Color.clear : Color(red: 0.9, green: 0.9, blue: 0.9))
+      .background(colorScheme == .dark ?
+                  Color.clear : Color(red: 0.9, green: 0.9, blue: 0.9))
 //              .onAppear { exsConductor.start() }
 //              .onDisappear { exsConductor.stop() }
               .onReceive(conductor.noteOnSubject) { (note, velocity) in
