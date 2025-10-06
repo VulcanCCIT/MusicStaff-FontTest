@@ -154,6 +154,25 @@ struct CalibrationWizardView: View {
     @State private var capturedMin: Int? = nil
     @State private var capturedMax: Int? = nil
 
+    private enum Mode: String, CaseIterable { case midi = "MIDI", manual = "Manual" }
+    @State private var mode: Mode = .midi
+
+    // Manual calibration state
+    @State private var selectedSize: Int = 61
+    private let manualSizes: [Int] = [37, 49, 61, 76, 88]
+
+    private let sizeToStandardRange: [Int: ClosedRange<Int>] = [
+        37: 36...72,   // C2–C5
+        49: 36...84,   // C2–C6
+        61: 36...96,   // C2–C7
+        76: 28...103,  // E1–G7
+        88: 21...108   // A0–C8
+    ]
+
+    private var manualComputedRange: ClosedRange<Int> {
+        sizeToStandardRange[selectedSize] ?? 36...96
+    }
+
     var body: some View {
         VStack(spacing: 24) {
             // Header with Cancel
@@ -164,65 +183,119 @@ struct CalibrationWizardView: View {
                 Button("Cancel") { isPresented = false }
             }
 
-            // Instructions and captured values
-            VStack(spacing: 16) {
-                switch step {
-                case .pressLowest:
-                    Text("Press the lowest key on your MIDI keyboard")
-                        .font(.headline)
-                case .pressHighest:
-                    Text("Press the highest key on your MIDI keyboard")
-                        .font(.headline)
-                case .review:
-                    Text("Confirm your keyboard range")
-                        .font(.headline)
+            // Mode picker
+            Picker("Calibration Mode", selection: $mode) {
+                Text("MIDI Keyboard").tag(Mode.midi)
+                Text("Manual").tag(Mode.manual)
+            }
+            .pickerStyle(.segmented)
+
+            if mode == .midi {
+                // Instructions and captured values (existing MIDI wizard)
+                VStack(spacing: 16) {
+                    switch step {
+                    case .pressLowest:
+                        Text("Press the lowest key on your MIDI keyboard")
+                            .font(.headline)
+                    case .pressHighest:
+                        Text("Press the highest key on your MIDI keyboard")
+                            .font(.headline)
+                    case .review:
+                        Text("Confirm your keyboard range")
+                            .font(.headline)
+                    }
+
+                    HStack(spacing: 24) {
+                        capturedBox(title: "Lowest", value: capturedMin, color: .blue)
+                        capturedBox(title: "Highest", value: capturedMax, color: .green)
+                    }
+
+                    if let size = currentSize {
+                        Text("Detected size: \(size) keys")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    switch step {
+                    case .pressLowest:
+                        Text("Waiting for lowest key…").foregroundStyle(.secondary)
+                    case .pressHighest:
+                        Text("Waiting for highest key…").foregroundStyle(.secondary)
+                    case .review:
+                        Text("If these look correct, tap Save. You can also Start Over to capture again.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                HStack(spacing: 24) {
-                    capturedBox(title: "Lowest", value: capturedMin, color: .blue)
-                    capturedBox(title: "Highest", value: capturedMax, color: .green)
-                }
+                Spacer()
 
-                if let size = currentSize {
-                    Text("Detected size: \(size) keys")
+                // Footer actions for MIDI mode
+                HStack {
+                    Button("Start Over") { startOver() }
+                        .buttonStyle(.bordered)
+                    Spacer()
+                    switch step {
+                    case .pressLowest, .pressHighest:
+                        ProgressView().progressViewStyle(.circular)
+                    case .review:
+                        Button("Save") { saveAndDismiss() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!canSave)
+                    }
+                }
+            } else {
+                // Manual calibration UI (Option 2)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Configure your keyboard without MIDI")
+                        .font(.headline)
+
+                    // Size picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Keyboard size")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Picker("Keyboard size", selection: $selectedSize) {
+                            ForEach(manualSizes, id: \.self) { size in
+                                Text("\(size) keys").tag(size)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Text("Starting and ending notes are fixed to industry‑standard ranges for each size.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    // Preview of the resulting range
+                    let lo = manualComputedRange.lowerBound
+                    let hi = manualComputedRange.upperBound
+                    Text("Result: \(midiNoteName(lo)) – \(midiNoteName(hi)) (\(selectedSize) keys)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
-                switch step {
-                case .pressLowest:
-                    Text("Waiting for lowest key…").foregroundStyle(.secondary)
-                case .pressHighest:
-                    Text("Waiting for highest key…").foregroundStyle(.secondary)
-                case .review:
-                    Text("If these look correct, tap Save. You can also Start Over to capture again.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            // Footer actions
-            HStack {
-                Button("Start Over") { startOver() }
-                    .buttonStyle(.bordered)
                 Spacer()
-                switch step {
-                case .pressLowest, .pressHighest:
-                    ProgressView().progressViewStyle(.circular)
-                case .review:
-                    Button("Save") { saveAndDismiss() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!canSave)
+
+                // Footer actions for Manual mode
+                HStack {
+                    Spacer()
+                    Button("Save") {
+                        appData.minMIDINote = manualComputedRange.lowerBound
+                        appData.maxMIDINote = manualComputedRange.upperBound
+                        isPresented = false
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
             }
         }
         .padding()
         .onChange(of: conductor.data.noteOn) { _, newValue in
+            // Only capture MIDI input when in MIDI mode
+            guard mode == .midi else { return }
             guard newValue > 0 else { return }
             handleIncoming(note: newValue)
         }
-        .frame(minWidth: 360, minHeight: 320)
+        .frame(minWidth: 360, minHeight: 380)
     }
 
     // MARK: - Helpers
