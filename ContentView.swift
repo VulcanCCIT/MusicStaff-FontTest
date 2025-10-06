@@ -609,7 +609,11 @@ struct ContentView: View {
               .frame(width: 200)
               Divider().frame(height: 20)
               Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
+              #if os(macOS)
                   .toggleStyle(.checkbox)
+              #else
+                  .toggleStyle(.switch)
+              #endif
           }
 
           Spacer()
