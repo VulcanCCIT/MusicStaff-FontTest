@@ -101,15 +101,23 @@ struct KeyBoardView: View {
         HStack(alignment: .center, spacing: 24) {
           KnobImage()
           KnobImage()
-
+          Spacer()
           NodeOutputView(conductor.instrument, color: .red)
             .frame(height: 52)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 300)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-
-          KnobImage()
-          KnobImage()
+          Spacer()
+          ZStack(alignment: .topTrailing) {
+            KnobImage()
+            Image("redled2")
+              .resizable()
+              .interpolation(.high)
+              .antialiased(true)
+              .frame(width: 36, height: 36)
+              .offset(x: 32, y: -16)
+              .accessibilityHidden(true)
+          }
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 20)
@@ -166,6 +174,15 @@ struct KeyBoardView: View {
       //.background(Color.clear)
       .background(colorScheme == .dark ?
                   Color.clear : Color("MeterPanelColor"))
+      .clipShape(
+        UnevenRoundedRectangle(
+          topLeadingRadius: 18,
+          bottomLeadingRadius: 0,
+          bottomTrailingRadius: 0,
+          topTrailingRadius: 18,
+          style: .continuous
+        )
+      )
               .onReceive(conductor.noteOnSubject) { (note, velocity) in
                   // Update visual intensity; audio already triggered in conductor
                   let boosted = min(127, Int(round(Double(velocity) * 2.25)))
