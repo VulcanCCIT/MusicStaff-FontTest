@@ -46,6 +46,8 @@ struct KeyBoardView: View {
   @EnvironmentObject private var conductor: MIDIMonitorConductor
   @State private var externalVelocities: [Int: Double] = [:] // midiNote -> 0.0...1.0
   
+  @State private var pressedCorrectness: [Int: Bool] = [:] // midi -> was-correct at noteOn
+  
   @State var scaleIndex = Scale.allCases.firstIndex(of: .chromatic) ?? 0 {
     didSet {
       if scaleIndex >= Scale.allCases.count { scaleIndex = 0 }
@@ -60,6 +62,7 @@ struct KeyBoardView: View {
   @Environment(\.colorScheme) var colorScheme
   
   @EnvironmentObject private var appData: AppData
+  var isCorrect: (Int) -> Bool = { _ in false }
 
   private var lowNote: Int {
     appData.calibratedRange?.lowerBound ?? 24
@@ -87,15 +90,6 @@ struct KeyBoardView: View {
   var body: some View {
     HStack {
       VStack {
-        
-//        // Display the current low note here
-//        Text("Lowest Note: \(noteName(from: lowNote)) (MIDI: \(lowNote))")
-//          .font(.headline)
-//        
-//        // Display the current high note here
-//        Text("Highest Note: \(noteName(from: highNote)) (MIDI: \(highNote))")
-//          .font(.headline)
-        
         
         // Full-width control panel above the keyboard (knobs and meter on one line)
         HStack(alignment: .center, spacing: 24) {
@@ -145,33 +139,31 @@ struct KeyBoardView: View {
         ) { pitch, isActivated in
           let midi = pitch.intValue
           let externallyOn = conductor.activeNotes.contains(midi)
-          //let externalIntensity = externalVelocities[midi] ?? 0.0
-          //let isBlack = [1, 3, 6, 8, 10].contains(midi % 12)
-          //let overlayColor: Color = isBlack ? .cyan : .blue
           ZStack {
+            let midi = pitch.intValue
+            // Persist correctness from note-on until note-off so color doesn't flip while held
+            let persisted: Bool? = pressedCorrectness[midi]
+            let isActive = isActivated || externallyOn
+            let effectiveCorrect: Bool = {
+              if isActive, let persisted {
+                return persisted
+              } else {
+                return isCorrect(midi)
+              }
+            }()
+            let color: Color = effectiveCorrect ? .green : .red
+            
             KeyboardKey(
               pitch: pitch,
               isActivated: isActivated || externallyOn,
               text: scientificLabel(for: pitch),
+              pressedColor: color,
               alignment: .bottom
             )
-//            Rectangle()
-//              .fill(overlayColor)
-//              .opacity(externalIntensity)
-//              .allowsHitTesting(false)
           }
         }
                 .frame(minWidth: 100, minHeight: 100)
-//                .overlay(alignment: .top) {
-//                  Rectangle()
-//                    .fill(Color.blue)
-//                    .frame(height: 15)
-//                    .cornerRadius(3)
-//                    //.padding(.horizontal, 6)
-//                    .allowsHitTesting(false)
-//                }
               }
-      //.background(Color.clear)
       .background(colorScheme == .dark ?
                   Color.clear : Color("MeterPanelColor"))
       .clipShape(
@@ -188,10 +180,12 @@ struct KeyBoardView: View {
                   let boosted = min(127, Int(round(Double(velocity) * 2.25)))
                   let norm = max(0.0, min(1.0, Double(boosted) / 127.0))
                   externalVelocities[note] = norm
+                  pressedCorrectness[note] = isCorrect(note)
               }
               .onReceive(conductor.noteOffSubject) { note in
                   // Remove visual intensity; audio already triggered in conductor
                   externalVelocities.removeValue(forKey: note)
+                  pressedCorrectness.removeValue(forKey: note)
               }
     }
   }

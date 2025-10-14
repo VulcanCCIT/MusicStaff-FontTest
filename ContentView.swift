@@ -355,6 +355,7 @@ struct ContentView: View {
 
   @State private var feedbackMessage: String = "Waiting for note…"
   @State private var feedbackColor: Color = .secondary
+  @State private var isCorrect: Bool? = nil
 
   @State private var showingCalibration = false
   @State private var showDebugOverlays = false
@@ -491,7 +492,9 @@ struct ContentView: View {
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
      //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
-      KeyBoardView()
+      KeyBoardView(isCorrect: { midi in
+        return midi == vm.currentNote.midi
+      })
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -559,6 +562,7 @@ struct ContentView: View {
       // Show the received values briefly before switching to waiting state
       let playedName = noteName(from: newValue)
       let correct = (newValue == vm.currentNote.midi)
+      isCorrect = correct
 
       // Build feedback message and color
       if correct {
@@ -678,5 +682,4 @@ struct ContentView: View {
         .environmentObject(MIDIMonitorConductor())
         .frame(width: 900, height: 900)
 }
-
 
