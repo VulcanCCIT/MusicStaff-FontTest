@@ -360,6 +360,15 @@ struct ContentView: View {
   @State private var showingCalibration = false
   @State private var showDebugOverlays = false
 
+  // Practice mode state
+  @State private var practiceCount: Int = 10
+  @State private var showingPractice: Bool = false
+  @State private var isPracticeMode: Bool = false
+  @State private var practiceAttempts: [PracticeAttempt] = []
+  @State private var practiceTargets: [(midi: Int, clef: Clef, accidental: String)] = []
+  @State private var currentPracticeIndex: Int = 0
+  @State private var showingResults: Bool = false
+
   // Removed isWaitingForNote and receivedBlankDelay
 
   private var currentNoteSymbol: MusicSymbol {
@@ -391,6 +400,106 @@ struct ContentView: View {
       attempts += 1
       if isInCalibratedRange(vm.currentNote.midi) { break }
     } while attempts < maxAttempts
+  }
+
+  // MARK: - Practice Mode Functions
+  private func startPractice() {
+    isPracticeMode = true
+    practiceAttempts.removeAll()
+    generatePracticeTargets()
+    currentPracticeIndex = 0
+    setCurrentPracticeTarget()
+    
+    feedbackMessage = "Practice Mode: Play note 1 of \(practiceCount)"
+    feedbackColor = .blue
+  }
+
+  private func generatePracticeTargets() {
+    practiceTargets.removeAll()
+    
+    for _ in 0..<practiceCount {
+      // Use the main VM to generate practice targets the same way as free play
+      let tempVM = StaffViewModel()
+      tempVM.setAllowedMIDIRange(appData.calibratedRange)
+      tempVM.setIncludeAccidentals(appData.includeAccidentals)
+      tempVM.randomizeNote() // This handles both clef and note selection properly
+      
+      practiceTargets.append((
+        midi: tempVM.currentNote.midi,
+        clef: tempVM.currentClef, // Use the clef that the VM selected, not a random one
+        accidental: tempVM.currentNote.accidental
+      ))
+    }
+  }
+
+  private func setCurrentPracticeTarget() {
+    guard currentPracticeIndex < practiceTargets.count else {
+      // Practice complete!
+      isPracticeMode = false
+      showingResults = true
+      feedbackMessage = "🎉 Practice Complete!"
+      feedbackColor = .green
+      return
+    }
+    
+    let target = practiceTargets[currentPracticeIndex]
+    
+    // Update the main VM with the practice target
+    vm.currentClef = target.clef
+    vm.currentNote = StaffNote(
+      name: noteName(from: target.midi),
+      midi: target.midi,
+      accidental: target.accidental
+    )
+    
+    feedbackMessage = "Practice: Play note \(currentPracticeIndex + 1) of \(practiceCount)"
+    feedbackColor = .blue
+  }
+
+  private func handlePracticeInput(_ playedMidi: Int) {
+    guard isPracticeMode && currentPracticeIndex < practiceTargets.count else { return }
+    
+    let target = practiceTargets[currentPracticeIndex]
+    let correct = (playedMidi == target.midi)
+    
+    // Record the attempt
+    practiceAttempts.append(
+      PracticeAttempt(
+        targetMidi: target.midi,
+        targetClef: target.clef,
+        targetAccidental: target.accidental,
+        playedMidi: playedMidi,
+        timestamp: Date(),
+        outcome: correct ? .correct : .incorrect
+      )
+    )
+    
+    if correct {
+      feedbackMessage = "Correct! \(noteName(from: playedMidi))"
+      feedbackColor = .green
+      
+      // Move to next note after a short delay
+      currentPracticeIndex += 1
+      
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        setCurrentPracticeTarget()
+      }
+    } else {
+      feedbackMessage = "Try again. You played \(noteName(from: playedMidi)), target is \(noteName(from: target.midi))"
+      feedbackColor = .red
+    }
+  }
+
+  private func exitPracticeMode() {
+    isPracticeMode = false
+    practiceAttempts.removeAll()
+    practiceTargets.removeAll()
+    currentPracticeIndex = 0
+    
+    // Return to free play mode
+    randomizeNoteRespectingCalibration()
+    feedbackMessage = "Waiting for note…"
+    feedbackColor = .secondary
   }
 
   private var calibrationDisplayText: String {
@@ -528,13 +637,45 @@ struct ContentView: View {
         .foregroundStyle(feedbackColor)
         .padding(.top, 4)
               
-      // Button to get a new random note on a random clef (only one clef at a time)
-      Button("New Note") {
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-          randomizeNoteRespectingCalibration()
+      // Practice mode controls or free play button
+      if isPracticeMode {
+        HStack(spacing: 12) {
+          Button("Exit Practice") {
+            exitPracticeMode()
+          }
+          .buttonStyle(.bordered)
+          
+          Text("Note \(currentPracticeIndex + 1) of \(practiceCount)")
+            .foregroundStyle(.secondary)
+        }
+      } else {
+        VStack(spacing: 12) {
+          // Free play button
+          Button("New Note") {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+              randomizeNoteRespectingCalibration()
+            }
+          }
+          .buttonStyle(.borderedProminent)
+
+          // Practice mode controls
+          HStack(spacing: 12) {
+            Text("Practice")
+            Picker("Practice Count", selection: $practiceCount) {
+              ForEach(Array(stride(from: 5, through: 100, by: 5)), id: \.self) { n in
+                Text("\(n)").tag(n)
+              }
+            }
+            .pickerStyle(.menu)
+            
+            Button("Start Practice") {
+              startPractice()
+            }
+            .buttonStyle(.bordered)
+          }
         }
       }
-      .buttonStyle(.borderedProminent)
+
       Spacer()
     }//vstack
     .onAppear {
@@ -559,26 +700,31 @@ struct ContentView: View {
       // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
       guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
 
-      // Show the received values briefly before switching to waiting state
-      let playedName = noteName(from: newValue)
-      let correct = (newValue == vm.currentNote.midi)
-      isCorrect = correct
-
-      // Build feedback message and color
-      if correct {
-        feedbackMessage = "You played \(playedName). That is correct! Try the next note now."
-        feedbackColor = .green
+      if isPracticeMode {
+        // Handle practice mode input
+        handlePracticeInput(newValue)
       } else {
-        feedbackMessage = "You played \(playedName). That is incorrect, try again."
-        feedbackColor = .red
-      }
+        // Handle free play mode input
+        let playedName = noteName(from: newValue)
+        let correct = (newValue == vm.currentNote.midi)
+        isCorrect = correct
 
-      // Auto-advance immediately if the played note matches the current target note
-      guard correct else { return }
+        // Build feedback message and color
+        if correct {
+          feedbackMessage = "You played \(playedName). That is correct! Try the next note now."
+          feedbackColor = .green
+        } else {
+          feedbackMessage = "You played \(playedName). That is incorrect, try again."
+          feedbackColor = .red
+        }
 
-      withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-        // Advance to the next target; keep last feedback visible
-        randomizeNoteRespectingCalibration()
+        // Auto-advance immediately if the played note matches the current target note
+        guard correct else { return }
+
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+          // Advance to the next target; keep last feedback visible
+          randomizeNoteRespectingCalibration()
+        }
       }
     }
     .onDisappear {
@@ -602,7 +748,7 @@ struct ContentView: View {
 
           // Centered Note style picker (no overlay, so nothing can overlap it)
           HStack(spacing: 8) {
-              Text("Note")
+              Text("Note Type")
               Picker("Note", selection: $appData.noteHeadStyle) {
                   Text("Whole").tag(NoteHeadStyle.whole)
                   Text("Half").tag(NoteHeadStyle.half)
@@ -647,6 +793,9 @@ struct ContentView: View {
           CalibrationWizardView(isPresented: $showingCalibration)
               .environmentObject(appData)
       }
+      .sheet(isPresented: $showingResults) {
+          PracticeResultsView(attempts: practiceAttempts)
+      }
   }
 
   // Staff drawing control (positions match your previous staff anchors)
@@ -682,4 +831,5 @@ struct ContentView: View {
         .environmentObject(MIDIMonitorConductor())
         .frame(width: 900, height: 900)
 }
+
 
