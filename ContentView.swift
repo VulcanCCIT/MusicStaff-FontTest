@@ -361,7 +361,7 @@ struct ContentView: View {
   @State private var showDebugOverlays = false
 
   // Practice mode state
-  @State private var practiceCount: Int = 10
+  @State private var practiceCount: Int = 5
   @State private var showingPractice: Bool = false
   @State private var isPracticeMode: Bool = false
   @State private var practiceAttempts: [PracticeAttempt] = []

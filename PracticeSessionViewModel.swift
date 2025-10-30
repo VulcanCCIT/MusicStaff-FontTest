@@ -77,6 +77,10 @@ final class PracticeSessionViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+    
+    deinit {
+        print("DEBUG DEINIT: PracticeSessionViewModel deallocated")
+    }
 
     // Convert MIDI note number to a human-readable note name (e.g., C4, F#3)
     private func noteName(from midi: Int) -> String {
@@ -120,10 +124,11 @@ final class PracticeSessionViewModel: ObservableObject {
     }
     
     private func setCurrentTarget() {
+        print("DEBUG: setCurrentTarget called - currentNoteIndex: \(currentNoteIndex), total notes: \(targetNotes.count)")
+        
+        // This should only be called when we know there are more notes
         guard currentNoteIndex < targetNotes.count else {
-            isComplete = true
-            feedbackMessage = "🎉 Practice Complete! View your results."
-            feedbackColor = .green
+            print("ERROR: setCurrentTarget called but no more notes! currentNoteIndex: \(currentNoteIndex), total notes: \(targetNotes.count)")
             return
         }
         
@@ -131,6 +136,9 @@ final class PracticeSessionViewModel: ObservableObject {
         currentTargetMidi = target.midi
         currentTargetClef = target.clef
         currentTargetAccidental = target.accidental
+        
+        print("DEBUG: Set target \(currentNoteIndex + 1) of \(targetNotes.count): MIDI \(target.midi) (\(noteName(from: target.midi))) on \(target.clef) clef")
+        print("DEBUG: isComplete is now: \(isComplete)")
         
         // Update staffVM for drawing purposes
         staffVM.currentClef = target.clef
@@ -145,6 +153,7 @@ final class PracticeSessionViewModel: ObservableObject {
 
     private func handlePlayed(_ played: Int) {
         guard !isComplete else { return }
+        
         let correct = (played == currentTargetMidi)
 
         // Always record the attempt
@@ -163,12 +172,26 @@ final class PracticeSessionViewModel: ObservableObject {
             feedbackMessage = "Correct! \(noteName(from: played))"
             feedbackColor = .green
             
-            // Move to the next target note
+            // Move to the next target note IMMEDIATELY - but check for completion AFTER incrementing
             currentNoteIndex += 1
             
-            // Small delay before moving to next note for better UX
+            // Check if we've completed all notes
+            if currentNoteIndex >= targetNotes.count {
+                isComplete = true
+                feedbackMessage = "🎉 Practice Complete! View your results."
+                feedbackColor = .green
+                return
+            }
+            
+            // Still have more notes, set the next target
+            setCurrentTarget()
+            
+            // Small delay only for clearing the "Correct!" feedback message
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                self?.setCurrentTarget()
+                if let self = self, !self.isComplete {
+                    self.feedbackMessage = "Play note \(self.currentIndex) of \(self.settings.count)"
+                    self.feedbackColor = .secondary
+                }
             }
         } else {
             feedbackMessage = "Try again. You played \(noteName(from: played)), but the target is \(noteName(from: currentTargetMidi))"
