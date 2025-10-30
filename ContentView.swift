@@ -748,7 +748,7 @@ struct ContentView: View {
 
           // Centered Note style picker (no overlay, so nothing can overlap it)
           HStack(spacing: 8) {
-              Text("Note Type")
+              Text("Note Type:")
               Picker("Note", selection: $appData.noteHeadStyle) {
                   Text("Whole").tag(NoteHeadStyle.whole)
                   Text("Half").tag(NoteHeadStyle.half)
