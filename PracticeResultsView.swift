@@ -9,7 +9,14 @@ struct PracticeTarget: Hashable {
 
 struct PracticeResultsView: View {
     let attempts: [PracticeAttempt]
+    let settings: PracticeSettings
+    let sessionStartDate: Date
+    
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    @State private var isSaved: Bool = false
+    @State private var saveError: Error?
 
     private var groupedResults: [(target: PracticeTarget, attempts: [PracticeAttempt], firstTryCorrect: Bool)] {
         let grouped = Dictionary(grouping: attempts) { attempt in
@@ -83,6 +90,36 @@ struct PracticeResultsView: View {
             }
         }
         .padding()
+        .onAppear {
+            savePracticeResults()
+        }
+    }
+    
+    // MARK: - Save Practice Results
+    
+    private func savePracticeResults() {
+        guard !isSaved else { return } // Don't save twice
+        
+        Task {
+            do {
+                let dataService = PracticeDataService(modelContext: modelContext)
+                try await dataService.savePracticeSession(
+                    startDate: sessionStartDate,
+                    endDate: Date(),
+                    settings: settings,
+                    attempts: attempts
+                )
+                await MainActor.run {
+                    isSaved = true
+                }
+                print("✅ Practice session saved successfully")
+            } catch {
+                await MainActor.run {
+                    saveError = error
+                }
+                print("❌ Failed to save practice session: \(error)")
+            }
+        }
     }
 }
 
@@ -392,5 +429,17 @@ struct PracticeNoteResultRow: View {
         // Note 3: A6 (MIDI 93) on treble clef - should be above staff with ledger lines  
         PracticeAttempt(targetMidi: 93, targetClef: .treble, targetAccidental: "", playedMidi: 93, timestamp: Date().addingTimeInterval(-2), outcome: .correct)
     ]
-    return PracticeResultsView(attempts: attempts)
+    
+    let settings = PracticeSettings(
+        count: 3,
+        includeAccidentals: false,
+        allowedRange: 60...84,
+        clefMode: .treble
+    )
+    
+    return PracticeResultsView(
+        attempts: attempts,
+        settings: settings,
+        sessionStartDate: Date().addingTimeInterval(-300) // 5 minutes ago
+    )
 }

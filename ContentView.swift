@@ -359,6 +359,7 @@ struct ContentView: View {
 
   @State private var showingCalibration = false
   @State private var showDebugOverlays = false
+  @State private var showingPracticeHistory = false
 
   // Practice mode state
   @State private var practiceCount: Int = 5
@@ -368,6 +369,13 @@ struct ContentView: View {
   @State private var practiceTargets: [(midi: Int, clef: Clef, accidental: String)] = []
   @State private var currentPracticeIndex: Int = 0
   @State private var showingResults: Bool = false
+  @State private var practiceStartDate: Date = Date()
+  @State private var practiceSettings: PracticeSettings = PracticeSettings(
+      count: 5,
+      includeAccidentals: false,
+      allowedRange: nil,
+      clefMode: .random
+  )
 
   // Removed isWaitingForNote and receivedBlankDelay
 
@@ -405,6 +413,16 @@ struct ContentView: View {
   // MARK: - Practice Mode Functions
   private func startPractice() {
     isPracticeMode = true
+    practiceStartDate = Date() // Capture the start time
+    
+    // Create practice settings
+    practiceSettings = PracticeSettings(
+        count: practiceCount,
+        includeAccidentals: appData.includeAccidentals,
+        allowedRange: appData.calibratedRange,
+        clefMode: .random // For now, using random as default
+    )
+    
     practiceAttempts.removeAll()
     generatePracticeTargets()
     currentPracticeIndex = 0
@@ -783,6 +801,11 @@ struct ContentView: View {
                   //.lineLimit(1)
                   .frame(width: 130)
 
+              Button("History") { 
+                  showingPracticeHistory = true 
+              }
+              .buttonStyle(.bordered)
+
               Button("Calibrate") { showingCalibration = true }
                   .buttonStyle(.bordered)
           }
@@ -794,7 +817,14 @@ struct ContentView: View {
               .environmentObject(appData)
       }
       .sheet(isPresented: $showingResults) {
-          PracticeResultsView(attempts: practiceAttempts)
+          PracticeResultsView(
+              attempts: practiceAttempts,
+              settings: practiceSettings,
+              sessionStartDate: practiceStartDate
+          )
+      }
+      .sheet(isPresented: $showingPracticeHistory) {
+          PracticeHistoryView()
       }
   }
 

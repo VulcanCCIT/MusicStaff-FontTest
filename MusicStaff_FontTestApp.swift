@@ -6,11 +6,27 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct MusicStaff_FontTestApp: App {
     @StateObject private var appData = AppData()
     @StateObject private var conductor = MIDIMonitorConductor()
+    
+    var sharedModelContainer: ModelContainer = {
+        let schema = Schema([
+            PracticeSession.self,
+            PersistedPracticeAttempt.self,
+            PracticeSessionSettings.self
+        ])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        do {
+            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }()
 
     var body: some Scene {
         WindowGroup {
@@ -18,5 +34,6 @@ struct MusicStaff_FontTestApp: App {
                 .environmentObject(appData)
                 .environmentObject(conductor)
         }
+        .modelContainer(sharedModelContainer)
     }
 }
