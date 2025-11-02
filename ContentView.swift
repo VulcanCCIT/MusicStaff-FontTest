@@ -622,6 +622,7 @@ struct ContentView: View {
       KeyBoardView(isCorrect: { midi in
         return midi == vm.currentNote.midi
       })
+      .frame(height: keyboardFixedHeight)
 
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
@@ -714,7 +715,9 @@ struct ContentView: View {
       vm.setIncludeAccidentals(newValue)
       randomizeNoteRespectingCalibration()
     }
-    .onChange(of: conductor.data.noteOn) { _, newValue in
+    .onChange(of: conductor.noteOnEventID) { _, _ in
+      // Read the latest note value for this event (fires even for repeated same MIDI note)
+      let newValue = conductor.data.noteOn
       // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
       guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
 
@@ -833,6 +836,8 @@ struct ContentView: View {
   private let bassStaffPoint   = CGPoint(x: 155, y: 230)
   private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
+  private let keyboardFixedHeight: CGFloat = 220
+
 }
 
 #Preview("Whole") {
@@ -861,5 +866,4 @@ struct ContentView: View {
         .environmentObject(MIDIMonitorConductor())
         .frame(width: 900, height: 900)
 }
-
 

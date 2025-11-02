@@ -142,7 +142,7 @@ final class PracticeDataService {
     @MainActor
     func analyzeNotePerformance() throws -> [NotePerformance] {
         let sessions = try fetchAllSessions()
-        var noteStats: [String: (correct: Int, total: Int)] = [:]
+        var noteStats: [String: (correct: Int, total: Int, clef: Clef, accidental: String)] = [:]
         
         for session in sessions {
             let groupedResults = Dictionary(grouping: session.attempts) { attempt in
@@ -152,9 +152,14 @@ final class PracticeDataService {
             for (key, attempts) in groupedResults {
                 let sortedAttempts = attempts.sorted { $0.timestamp < $1.timestamp }
                 let firstTryCorrect = sortedAttempts.first?.outcome == PracticeOutcome.correct.rawValue
-                
+
+                // Derive metadata from the first attempt in this group
+                let first = sortedAttempts.first!
+                let clef = first.clefEnum
+                let accidental = first.targetAccidental
+
                 if noteStats[key] == nil {
-                    noteStats[key] = (correct: 0, total: 0)
+                    noteStats[key] = (correct: 0, total: 0, clef: clef, accidental: accidental)
                 }
                 noteStats[key]!.total += 1
                 if firstTryCorrect {
@@ -164,20 +169,14 @@ final class PracticeDataService {
         }
         
         return noteStats.compactMap { key, stats in
+            // Key format: "<midi>_<clefString>_<accidental>" — we only trust MIDI from the key; clef/accidental come from stats
             let components = key.split(separator: "_")
-            guard components.count == 3,
-                  let midi = Int(components[0]),
-                  let clef = Clef(rawValue: String(components[1])) else {
-                return nil
-            }
-            
-            let accidental = String(components[2])
+            guard let midi = components.first.flatMap({ Int($0) }) else { return nil }
             let accuracy = Double(stats.correct) / Double(stats.total)
-            
             return NotePerformance(
                 midi: midi,
-                clef: clef,
-                accidental: accidental,
+                clef: stats.clef,
+                accidental: stats.accidental,
                 correctAttempts: stats.correct,
                 totalAttempts: stats.total,
                 accuracy: accuracy

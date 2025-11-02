@@ -9,24 +9,53 @@ struct PracticeStatisticsView: View {
     @State private var notePerformance: [NotePerformance] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var lifetimeIncorrectPlayedCounts: [(midi: Int, count: Int)] = []
+    @State private var lifetimePlayedToMistakenTargets: [Int: [Int: Int]] = [:]
+
+    @AppStorage("statsShowThumbnails") private var showThumbnails: Bool = false
+    @State private var userOverrodeThumbnailPref: Bool = false
+    private let thumbnailAutoWidthThreshold: CGFloat = 900
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if isLoading {
-                    ProgressView("Analyzing your practice data...")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if let errorMessage = errorMessage {
-                    errorStateView(errorMessage)
-                } else if let stats = statistics {
-                    statisticsContent(stats)
-                } else {
-                    emptyStateView
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Toggle("Show Thumbnails", isOn: Binding(get: { showThumbnails }, set: { newValue in
+                        showThumbnails = newValue
+                        userOverrodeThumbnailPref = true
+                    }))
+                    .toggleStyle(.switch)
+                    .padding(.bottom, 4)
+                    Text("Automatically enabled on wide windows; you can override here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    if isLoading {
+                        ProgressView("Analyzing your practice data...")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else if let errorMessage = errorMessage {
+                        errorStateView(errorMessage)
+                    } else if let stats = statistics {
+                        statisticsContent(stats)
+                    } else {
+                        emptyStateView
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .onChange(of: width) { _, newWidth in
+                if !userOverrodeThumbnailPref {
+                    showThumbnails = newWidth >= thumbnailAutoWidthThreshold
                 }
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear {
+                if !userOverrodeThumbnailPref {
+                    showThumbnails = width >= thumbnailAutoWidthThreshold
+                }
+            }
         }
         .frame(minWidth: 800, minHeight: 600)
         .navigationTitle("Practice Statistics")
@@ -112,6 +141,8 @@ struct PracticeStatisticsView: View {
         
         // Session Activity Card
         sessionActivityCard(stats)
+        
+        lifetimeTrendsCard
         
         // Note Performance Analysis
         if !notePerformance.isEmpty {
@@ -220,7 +251,7 @@ struct PracticeStatisticsView: View {
             
             LazyVStack(spacing: 8) {
                 ForEach(notePerformance.prefix(10)) { performance in
-                    NotePerformanceRow(performance: performance)
+                    NotePerformanceRow(performance: performance, showThumbnail: showThumbnails)
                 }
             }
             
@@ -229,6 +260,116 @@ struct PracticeStatisticsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
+            }
+        }
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+    
+    @ViewBuilder
+    private var lifetimeTrendsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Lifetime Note Trends")
+                .font(.title2.bold())
+
+            // Most common incorrect notes (played)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Most Common Incorrect Notes (All Time)")
+                    .font(.headline)
+                if lifetimeIncorrectPlayedCounts.isEmpty {
+                    Text("No incorrect notes recorded yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(Array(lifetimeIncorrectPlayedCounts.prefix(10).enumerated()), id: \.offset) { _, item in
+                            HStack(spacing: 12) {
+                                NoteOnStaffView(midi: item.midi, clef: suggestedClef(for: item.midi), accidental: accidentalForMidi(item.midi))
+                                    .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(noteName(from: item.midi)) — \(item.count) time\(item.count == 1 ? "" : "s")")
+                                        .font(.title3)
+                                        .bold()
+                                    if let mistaken = lifetimePlayedToMistakenTargets[item.midi] {
+                                        let sortedTargets = mistaken.sorted { $0.value > $1.value }
+                                        let details = sortedTargets.prefix(3).map { "\(noteName(from: $0.key)) (\($0.value))" }.joined(separator: ", ")
+                                        if !details.isEmpty {
+                                            Text("Often mistaken for: \(details)")
+                                                .font(.body)
+                                                .bold()
+                                                .foregroundStyle(.primary)
+                                        }
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(8)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            // Consistently correct notes (100% accuracy)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Consistently Correct Notes (All Time)")
+                    .font(.headline)
+                let alwaysCorrect = notePerformance.filter { $0.accuracy == 1.0 }.sorted { $0.totalAttempts > $1.totalAttempts }
+                if alwaysCorrect.isEmpty {
+                    Text("No notes at 100% accuracy yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(alwaysCorrect.prefix(10)) { perf in
+                            HStack(spacing: 12) {
+                                NoteOnStaffView(midi: perf.midi, clef: perf.clef, accidental: perf.accidental)
+                                    .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(perf.noteName)
+                                        .font(.title3)
+                                        .bold()
+                                    Text("\(perf.totalAttempts) attempt\(perf.totalAttempts == 1 ? "" : "s")")
+                                        .font(.body)
+                                        .bold()
+                                        .foregroundStyle(.primary)
+                                }
+                                Spacer()
+                            }
+                            .padding(8)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+
+            // Notes needing practice (lowest accuracy)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Notes Needing Practice (All Time)")
+                    .font(.headline)
+                if notePerformance.isEmpty {
+                    Text("No lifetime data available.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(notePerformance.prefix(10)) { perf in
+                            HStack(spacing: 12) {
+                                NoteOnStaffView(midi: perf.midi, clef: perf.clef, accidental: perf.accidental)
+                                    .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(perf.noteName)
+                                        .font(.title3)
+                                        .bold()
+                                    Text("\(Int(perf.accuracy * 100))% accuracy")
+                                        .font(.body)
+                                        .bold()
+                                        .foregroundStyle(perf.accuracy >= 0.8 ? .green : perf.accuracy >= 0.6 ? .orange : .red)
+                                }
+                                Spacer()
+                            }
+                            .padding(8)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                }
             }
         }
         .padding()
@@ -252,15 +393,47 @@ struct PracticeStatisticsView: View {
     private func loadStatistics() {
         Task { @MainActor in
             do {
-                guard let dataService = practiceDataService else { 
+                guard let dataService = practiceDataService else {
                     errorMessage = "Data service not initialized"
                     isLoading = false
-                    return 
+                    return
                 }
                 
                 print("📊 Loading statistics...")
                 let stats = try dataService.getOverallStatistics()
                 let noteStats = try dataService.analyzeNotePerformance()
+                
+                // Build lifetime incorrect note statistics (played vs mistaken targets)
+                let allSessions = try dataService.fetchAllSessions()
+                var allAttempts: [PracticeAttempt] = []
+                for session in allSessions {
+                    for pa in session.attempts {
+                        allAttempts.append(
+                            PracticeAttempt(
+                                targetMidi: pa.targetMidi,
+                                targetClef: pa.clefEnum,
+                                targetAccidental: pa.targetAccidental,
+                                playedMidi: pa.playedMidi,
+                                timestamp: pa.timestamp,
+                                outcome: pa.outcomeEnum
+                            )
+                        )
+                    }
+                }
+                let counts = allAttempts.filter { $0.outcome == .incorrect }.reduce(into: [Int: Int]()) { dict, attempt in
+                    dict[attempt.playedMidi, default: 0] += 1
+                }
+                lifetimeIncorrectPlayedCounts = counts.sorted { lhs, rhs in
+                    if lhs.value == rhs.value { return lhs.key < rhs.key }
+                    return lhs.value > rhs.value
+                }.map { (key: Int, value: Int) in (midi: key, count: value) }
+                var mapping: [Int: [Int: Int]] = [:]
+                for a in allAttempts where a.outcome == .incorrect {
+                    var inner = mapping[a.playedMidi, default: [:]]
+                    inner[a.targetMidi, default: 0] += 1
+                    mapping[a.playedMidi] = inner
+                }
+                lifetimePlayedToMistakenTargets = mapping
                 
                 print("📊 Statistics loaded:")
                 print("  - Total Sessions: \(stats.totalSessions)")
@@ -352,6 +525,25 @@ struct PracticeStatisticsView: View {
         }
     }
     #endif
+    
+    private func suggestedClef(for midi: Int) -> Clef { midi < 60 ? .bass : .treble }
+    private func accidentalForMidi(_ midi: Int) -> String {
+        let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        let flats = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
+        let pc = midi % 12
+        let raw = names[pc]
+        let flatRaw = flats[pc]
+        let useSharps = raw.count <= flatRaw.count
+        let symbol = useSharps ? raw : flatRaw
+        if symbol.contains("#") { return "♯" }
+        if symbol.contains("b") { return "♭" }
+        return ""
+    }
+    private func noteName(from midi: Int) -> String {
+        let k = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        guard (0...127).contains(midi) else { return "—" }
+        return k[midi % 12] + String((midi / 12) - 1)
+    }
 }
 
 struct StatisticCard: View {
@@ -393,13 +585,19 @@ struct StatisticCard: View {
 
 struct NotePerformanceRow: View {
     let performance: NotePerformance
+    var showThumbnail: Bool = false
     
     var body: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 12) {
+            if showThumbnail {
+                NoteOnStaffView(midi: performance.midi, clef: performance.clef, accidental: performance.accidental)
+                    .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+            }
             // Note information
             VStack(alignment: .leading, spacing: 2) {
                 Text(performance.noteName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.title3)
+                    .bold()
                 
                 HStack(spacing: 4) {
                     Image(systemName: performance.clef == .treble ? "music.note" : "music.note.list")
@@ -407,13 +605,15 @@ struct NotePerformanceRow: View {
                         .foregroundStyle(.secondary)
                     
                     Text(performance.clef == .treble ? "Treble" : "Bass")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.body)
+                        .bold()
+                        .foregroundStyle(.primary)
                     
                     if !performance.accidental.isEmpty {
                         Text(performance.accidental)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.body)
+                            .bold()
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -423,10 +623,12 @@ struct NotePerformanceRow: View {
             // Performance metrics
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(performance.correctAttempts)/\(performance.totalAttempts)")
-                    .font(.subheadline.weight(.medium))
+                    .font(.title3)
+                    .bold()
                 
                 Text("\(performance.accuracy * 100, specifier: "%.0f")%")
-                    .font(.caption)
+                    .font(.body)
+                    .bold()
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
                     .background(
@@ -446,9 +648,89 @@ struct NotePerformanceRow: View {
     }
 }
 
+struct NoteOnStaffView: View {
+    let midi: Int
+    let clef: Clef
+    let accidental: String
+
+    private let noteX: CGFloat = 166
+    private let trebleStaffPoint = CGPoint(x: 155, y: 150)
+    private let bassStaffPoint   = CGPoint(x: 155, y: 230)
+    private let lineWidth: CGFloat = 24
+
+    var body: some View {
+        Canvas { context, size in
+            let baseHeight: CGFloat = 320
+            let scale = min(size.height / baseHeight, 1.0)
+            context.drawLayer { layer in
+                layer.scaleBy(x: scale, y: scale)
+
+                let virtualWidth = size.width / scale
+                let virtualHeight = size.height / scale
+                let centerX = virtualWidth / 2
+                let centerY = virtualHeight / 2
+                let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2
+                let offsetX = centerX - noteX
+                let offsetY = centerY - originalGroupMidY
+                layer.translateBy(x: offsetX, y: offsetY)
+
+                let vm = StaffViewModel()
+                vm.setIncludeAccidentals(true)
+                vm.setAllowedMIDIRange(nil)
+                vm.currentClef = clef
+                vm.currentNote = StaffNote(name: noteName(from: midi), midi: midi, accidental: accidental)
+
+                let treble = MusicSymbol.trebleStaff.text()
+                let bass = MusicSymbol.bassStaff.text()
+                if clef == .treble {
+                    layer.draw(treble, at: trebleStaffPoint)
+                    layer.drawLayer { sub in
+                        sub.opacity = 0.3
+                        sub.draw(bass, at: bassStaffPoint)
+                    }
+                } else {
+                    layer.drawLayer { sub in
+                        sub.opacity = 0.3
+                        sub.draw(treble, at: trebleStaffPoint)
+                    }
+                    layer.draw(bass, at: bassStaffPoint)
+                }
+
+                let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+                for y in ledgerYs {
+                    var p = Path()
+                    p.move(to: CGPoint(x: noteX - lineWidth/2, y: y))
+                    p.addLine(to: CGPoint(x: noteX + lineWidth/2, y: y))
+                    layer.stroke(p, with: .color(.primary), lineWidth: 1.2)
+                }
+
+                let acc = vm.currentNote.accidental
+                let notePoint = CGPoint(x: noteX, y: vm.currentY)
+                if acc == "♯" {
+                    layer.draw(MusicSymbol.sharpSymbol.text(), at: CGPoint(x: noteX - 18, y: vm.currentY), anchor: .center)
+                } else if acc == "♭" {
+                    layer.draw(MusicSymbol.flatSymbol.text(), at: CGPoint(x: noteX - 18, y: vm.currentY), anchor: .center)
+                } else if acc == "♮" {
+                    layer.draw(MusicSymbol.naturalSymbol.text(), at: CGPoint(x: noteX - 18, y: vm.currentY), anchor: .center)
+                }
+
+                let noteText = MusicSymbol.quarterNoteUP.text()
+                layer.draw(noteText, at: notePoint, anchor: .center)
+            }
+        }
+    }
+
+    private func noteName(from midi: Int) -> String {
+        let k = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        guard (0...127).contains(midi) else { return "—" }
+        return k[midi % 12] + String((midi / 12) - 1)
+    }
+}
+
 #Preview {
     NavigationView {
         PracticeStatisticsView()
     }
     .modelContainer(for: PracticeSession.self, inMemory: true)
 }
+
