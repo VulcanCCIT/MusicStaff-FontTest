@@ -540,7 +540,8 @@ struct ContentView: View {
       midiReceivedIndicator
      // Spacer()
 
-     //KeyBoardView()
+     // Removed inline KeyBoardView here per instructions
+
       // Staff and note drawing
       Canvas { context, size in
         // Center the entire staff/note drawing within the canvas
@@ -618,12 +619,6 @@ struct ContentView: View {
       .frame(height: 320) //was 420
       .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
 
-     //ToDo make KeyBoarView() be sized based on the calibrated low and high note.
-      KeyBoardView(isCorrect: { midi in
-        return midi == vm.currentNote.midi
-      })
-      .frame(height: keyboardFixedHeight)
-
       // Labels for clef, note name and MIDI code
       HStack(spacing: 12) {
         Text("Clef:")
@@ -696,7 +691,14 @@ struct ContentView: View {
       }
 
       Spacer()
-    }//vstack
+    } // VStack
+    .safeAreaInset(edge: .bottom) {
+      KeyBoardView(isCorrect: { midi in
+          midi == vm.currentNote.midi
+      }, docked: true)
+      .environmentObject(appData)
+      .environmentObject(conductor)
+    }
     .onAppear {
       vm.setAllowedMIDIRange(appData.calibratedRange)
       vm.setIncludeAccidentals(appData.includeAccidentals)
@@ -836,7 +838,8 @@ struct ContentView: View {
   private let bassStaffPoint   = CGPoint(x: 155, y: 230)
   private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
-  private let keyboardFixedHeight: CGFloat = 220
+  // Removed:
+  // private let keyboardFixedHeight: CGFloat = 220
 
 }
 

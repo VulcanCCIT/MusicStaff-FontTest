@@ -64,6 +64,7 @@ struct KeyBoardView: View {
   
   @EnvironmentObject private var appData: AppData
   var isCorrect: (Int) -> Bool = { _ in false }
+  var docked: Bool = false
 
   private var lowNote: Int {
     appData.calibratedRange?.lowerBound ?? 24
@@ -151,8 +152,21 @@ struct KeyBoardView: View {
         )
         .padding(.horizontal)
         
+        // Piano rail separator tying panel and keyboard together
+        PianoRail()
+          .frame(height: 14)
+          .padding(.horizontal, 22)
+          .padding(.top, -4)
+          .padding(.bottom, 2)
+
         // Keyboard View (2D or 3D)
-        Group {
+        GeometryReader { proxy in
+          let whiteCount = max(1, (lowNote...highNote).filter { ![1,3,6,8,10].contains($0 % 12) }.count)
+          let keyWidth = proxy.size.width / CGFloat(whiteCount)
+          let lengthFactor: CGFloat = is3DMode ? 4.6 : 3.4
+          let idealHeight = keyWidth * lengthFactor
+          let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...300) : idealHeight.clamped(to: 170...320)
+          
           if is3DMode {
             Keyboard3DView(
               lowNote: lowNote,
@@ -163,51 +177,101 @@ struct KeyBoardView: View {
               externalVelocities: $externalVelocities,
               scientificLabel: scientificLabel
             )
+            .frame(height: responsiveHeight)
           } else {
-            Keyboard(
-              layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
-              noteOn: { pitch, point in
-                // Map vertical position to MIDI velocity and notify conductor (audio is triggered in conductor)
-                let raw = Int(point.y * 127)
-                let vel = max(1, min(127, raw))
-                conductor.simulateNoteOn(noteNumber: pitch.intValue, velocity: vel)
-              },
-              noteOff: { pitch in
-                // Notify conductor of note off (audio is triggered in conductor)
-                conductor.simulateNoteOff(noteNumber: pitch.intValue)
-              }
-            ) { pitch, isActivated in
-              let midi = pitch.intValue
-              let externallyOn = conductor.activeNotes.contains(midi)
-              ZStack {
+            ZStack {
+              // Dark keybed background constrained to keyboard height
+              KeybedBackground()
+                .frame(height: responsiveHeight)
+                .clipped()
+
+              Keyboard(
+                layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
+                noteOn: { pitch, point in
+                  // Map vertical position to MIDI velocity and notify conductor (audio is triggered in conductor)
+                  let raw = Int(point.y * 127)
+                  let vel = max(1, min(127, raw))
+                  conductor.simulateNoteOn(noteNumber: pitch.intValue, velocity: vel)
+                },
+                noteOff: { pitch in
+                  // Notify conductor of note off (audio is triggered in conductor)
+                  conductor.simulateNoteOff(noteNumber: pitch.intValue)
+                }
+              ) { pitch, isActivated in
                 let midi = pitch.intValue
-                // Persist correctness from note-on until note-off so color doesn't flip while held
-                let persisted: Bool? = pressedCorrectness[midi]
-                let isActive = isActivated || externallyOn
-                let effectiveCorrect: Bool = {
-                  if isActive, let persisted {
-                    return persisted
-                  } else {
-                    return isCorrect(midi)
-                  }
-                }()
-                let color: Color = effectiveCorrect ? .green : .red
-                
-                KeyboardKey(
-                  pitch: pitch,
-                  isActivated: isActivated || externallyOn,
-                  text: scientificLabel(for: pitch),
-                  pressedColor: color,
-                  alignment: .bottom
-                )
+                let externallyOn = conductor.activeNotes.contains(midi)
+                ZStack {
+                  let midi = pitch.intValue
+                  // Persist correctness from note-on until note-off so color doesn't flip while held
+                  let persisted: Bool? = pressedCorrectness[midi]
+                  let isActive = isActivated || externallyOn
+                  let effectiveCorrect: Bool = {
+                    if isActive, let persisted {
+                      return persisted
+                    } else {
+                      return isCorrect(midi)
+                    }
+                  }()
+                  let color: Color = effectiveCorrect ? .green : .red
+                  
+                  KeyboardKey(
+                    pitch: pitch,
+                    isActivated: isActivated || externallyOn,
+                    text: scientificLabel(for: pitch),
+                    pressedColor: color,
+                    alignment: .bottom
+                  )
+                }
               }
             }
-            .frame(minWidth: 100, minHeight: 100)
+            .padding(.horizontal, 8) // thinner left/right bezel
+            .padding(.bottom, 10)
+            .background(
+              ZStack {
+                // Unified chassis color to match the top panel
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                  .fill(Color("MeterPanelColor"))
+
+                // Subtle vertical sheen similar to Panel3DBackground
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                  .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
+                  .blendMode(.softLight)
+
+                // Inner bottom lip for depth
+                VStack {
+                  Spacer()
+                  RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
+                    .frame(height: 8)
+                    .padding(.horizontal, 8)
+                    .opacity(0.9)
+                }
+                .padding(.vertical, 6)
+              }
+            )
+            .overlay(
+              // Edge highlight
+              RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                .blendMode(.overlay)
+            )
+            .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
+            .frame(height: responsiveHeight + 18)
           }
         }
+        .frame(minHeight: 170)
+        .padding(.bottom, docked ? 0 : (is3DMode ? 40 : 28))
       }
-      .background(colorScheme == .dark ?
-                  Color.clear : Color("MeterPanelColor"))
+      .background(
+          docked ? Color.clear : (colorScheme == .dark ? Color.clear : Color("MeterPanelColor"))
+      )
+      .overlay(alignment: .top) {
+          if docked {
+              Rectangle()
+                  .fill(Color.black.opacity(0.15))
+                  .frame(height: 1)
+          }
+      }
       .clipShape(
         UnevenRoundedRectangle(
           topLeadingRadius: 18,
@@ -310,7 +374,7 @@ struct Panel3DBackground: View {
         VStack {
           Spacer()
           RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(LinearGradient(colors: [Color.black.opacity(0.20), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
+            .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
             .frame(height: max(6, proxy.size.height * 0.06))
             .padding(.horizontal, 8)
             .opacity(0.8)
@@ -391,6 +455,47 @@ struct GlassReflection: View {
   }
 }
 
+struct PianoRail: View {
+    var body: some View {
+      ZStack {
+        // Base glossy black rail
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(LinearGradient(colors: [Color.black.opacity(0.95), Color(white: 0.08)], startPoint: .top, endPoint: .bottom))
+
+        // Top highlight
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+          .blendMode(.overlay)
+
+        // Subtle inner glow hinting a purple tint from legacy design
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .fill(LinearGradient(colors: [Color.purple.opacity(0.10), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+          .blendMode(.plusLighter)
+      }
+      .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+    }
+  }
+
+  struct KeybedBackground: View {
+    var body: some View {
+      GeometryReader { size in
+        ZStack {
+          // Backplate behind keys
+          LinearGradient(colors: [Color.black, Color.black.opacity(0.92), Color.black.opacity(0.88)], startPoint: .top, endPoint: .bottom)
+          // Subtle top lip shadow right under the rail
+          VStack(spacing: 0) {
+            Rectangle()
+              .fill(Color.black.opacity(0.70))
+              .frame(height: 2)
+            Rectangle()
+              .fill(Color.white.opacity(0.04))
+              .frame(height: 1)
+            Spacer()
+          }
+        }
+      }
+    }
+  }
 
 //#Preview {
 //  let data = AppData()
@@ -430,14 +535,19 @@ struct Keyboard3DView: View {
 
     // Hit-testing / depth defaults
     private let whiteFrontGuardRatio: CGFloat = 0.10 // front 10% is always white-only for taps
-    private let frontFaceReserveFactor: CGFloat = 0.35
-    private let blackKeyDepthRatio: CGFloat = 0.70
+    private let frontFaceReserveFactor: CGFloat = 0.28
+    // Removed: private let blackKeyDepthRatio: CGFloat = 0.76
 
     private func scaleFor(size: CGSize) -> CGFloat {
         // Designed around ~220pt height; clamp to keep proportions sane
         let baseline: CGFloat = 220
         let s = size.height / baseline
         return min(max(s, 0.6), 1.4)
+    }
+    
+    private func blackDepthRatio(for size: CGSize) -> CGFloat {
+        let s = scaleFor(size: size) // ~0.6 ... 1.4
+        return 0.62 + 0.06 * min(max(s, 0.6), 1.0) // 0.62 ... 0.68
     }
     
     private func isBlackKey(_ midi: Int) -> Bool {
@@ -528,11 +638,14 @@ struct Keyboard3DView: View {
         let whiteShadowOffset = 8 * s
         let blackShadowOffset = 9 * s
 
+        // Inserted bottom margin constant
+        let bottomMargin = max(16, whiteFrontH * 1.25) // larger reserve so front faces never clip
+
         // Subtle perspective and placement similar to the reference photo
         // Show more depth while still guaranteeing the white-key front faces are visible
         let a: CGFloat = 0.20 / 0.72 // relationship between keyboardY and depth
         let preferredDepth = totalHeight // allow as much depth as available; clamp below prevents clipping
-        let maxDepthByHeight = max(60, (totalHeight - whiteFrontH * frontFaceReserveFactor - 2) / (1 + a))
+        let maxDepthByHeight = max(60, (totalHeight - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
         let keyboardDepth: CGFloat = min(preferredDepth, maxDepthByHeight)
 
         // Keyboard case/background
@@ -542,7 +655,7 @@ struct Keyboard3DView: View {
         var underShadow = Path()
         underShadow.move(to: CGPoint(x: 0, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
         underShadow.addLine(to: CGPoint(x: totalWidth, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
-        context.stroke(underShadow, with: .color(Color.black.opacity(0.35)), lineWidth: max(2, caseH * 0.15))
+        context.stroke(underShadow, with: .color(Color.black.opacity(0.45)), lineWidth: max(2, caseH * 0.15))
 
         // Fill white key area to avoid gaps (uses the backScale constant)
         let backWidth = totalWidth * backScale
@@ -560,6 +673,8 @@ struct Keyboard3DView: View {
         let whiteKeys = (lowNote...highNote).filter { !isBlackKey($0) }
         let blackKeys = (lowNote...highNote).filter { isBlackKey($0) }
         let keySpacing = totalWidth / CGFloat(max(1, whiteKeys.count))
+        
+        let bdr = blackDepthRatio(for: size)
 
         for (index, midi) in whiteKeys.enumerated() {
             let x = CGFloat(index) * keySpacing
@@ -599,12 +714,13 @@ struct Keyboard3DView: View {
                     context: context,
                     midi: midi,
                     x: x,
-                    width: keySpacing * 0.60,
+                    width: keySpacing * 0.56,
                     keyboardY: keyboardDepth * 0.20 / 0.72,
                     keyboardDepth: keyboardDepth,
                     viewDistance: 200,
                     blackFrontHeight: blackFrontH,
                     elevation: elevation,
+                    blackDepthRatio: bdr,
                     shadowOffset: blackShadowOffset
                 )
             }
@@ -619,7 +735,7 @@ struct Keyboard3DView: View {
             var groove = Path()
             groove.move(to: CGPoint(x: x, y: frontY))
             groove.addLine(to: CGPoint(x: x, y: frontY + grooveHeight))
-            context.stroke(groove, with: .color(Color.black.opacity(0.25)), lineWidth: 0.6)
+            context.stroke(groove, with: .color(Color.black.opacity(0.32)), lineWidth: 0.6)
         }
     }
     
@@ -822,12 +938,13 @@ struct Keyboard3DView: View {
         viewDistance: CGFloat,
         blackFrontHeight: CGFloat,
         elevation: CGFloat,
+        blackDepthRatio: CGFloat,
         shadowOffset: CGFloat
     ) {
         let isPressed = conductor.activeNotes.contains(midi)
         let pressDepth: CGFloat = isPressed ? 7 : 0
 
-        let blackKeyDepth = keyboardDepth * blackKeyDepthRatio
+        let blackKeyDepth = keyboardDepth * blackDepthRatio
         let elevationOffset: CGFloat = elevation
 
         let backWidth = width * backScale
@@ -972,12 +1089,12 @@ struct Keyboard3DView: View {
         // Position black keys correctly between white keys
         let note = midi % 12
         switch note {
-        case 1: return 0.65  // C# - between C and D
-        case 3: return 0.35  // D# - between D and E  
-        case 6: return 0.65  // F# - between F and G
-        case 8: return 0.5   // G# - between G and A
-        case 10: return 0.35 // A# - between A and B
-        default: return 0.5
+        case 1: return 0.62  // C# - a touch left from center between C and D
+        case 3: return 0.38  // D# - a touch right from center between D and E  
+        case 6: return 0.62  // F#
+        case 8: return 0.50  // G#
+        case 10: return 0.38 // A#
+        default: return 0.50
         }
     }
     
@@ -990,8 +1107,12 @@ struct Keyboard3DView: View {
         // Mirror the drawing proportions and compute keyboardY from depth so hit-testing matches visuals
         let a: CGFloat = 0.20 / 0.72
         let whiteFrontH = whiteFrontHeight * scaleFor(size: size)
+
+        // Inserted bottom margin constant
+        let bottomMargin = max(16, whiteFrontH * 1.25)
+
         let preferredDepth = size.height // allow deeper keys; clamp below
-        let maxDepthByHeight = max(60, (size.height - whiteFrontH * frontFaceReserveFactor - 2) / (1 + a))
+        let maxDepthByHeight = max(60, (size.height - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
         let keyboardDepth = min(preferredDepth, maxDepthByHeight)
         let keyboardY = keyboardDepth * a
 
@@ -1004,7 +1125,7 @@ struct Keyboard3DView: View {
         }
 
         // Adjusted hitBlackDepth per instructions
-        let blackKeyDepth = keyboardDepth * blackKeyDepthRatio
+        let blackKeyDepth = keyboardDepth * blackDepthRatio(for: size)
         let hitBlackDepth = blackKeyDepth * 1.05 + (scaleFor(size: size) * 10)
         
         let elevation = blackKeyElevation * scaleFor(size: size)
@@ -1015,7 +1136,7 @@ struct Keyboard3DView: View {
             let keyIndex = Int(clampedX / keySpacing)
             if keyIndex >= 0 && keyIndex < whiteKeys.count {
                 let whiteKeyMidi = whiteKeys[keyIndex]
-                let blackWidth = keySpacing * 0.60 * 0.90 // widened hit-box for more forgiving touches
+                let blackWidth = keySpacing * 0.56 * 0.95 // widened hit-box for more forgiving touches
 
                 // Check right-side black key above this white key
                 let rightBlack = whiteKeyMidi + 1
@@ -1055,6 +1176,12 @@ struct Keyboard3DView: View {
     }
 }
 
+extension Comparable {
+  func clamped(to range: ClosedRange<Self>) -> Self {
+    return min(max(self, range.lowerBound), range.upperBound)
+  }
+}
+
 #Preview {
     let data = AppData()
     data.minMIDINote = 60
@@ -1065,5 +1192,23 @@ struct Keyboard3DView: View {
     .environmentObject(data)
     .environmentObject(MIDIMonitorConductor())
     .frame(height: 220)
+}
+
+#Preview("Docked Keyboard") {
+    let data = AppData()
+    data.minMIDINote = 60
+    data.maxMIDINote = 72
+    return VStack {
+        Spacer()
+        Text("Main Content Above")
+            .padding()
+    }
+    .environmentObject(data)
+    .environmentObject(MIDIMonitorConductor())
+    .safeAreaInset(edge: .bottom) {
+        KeyBoardView(isCorrect: { _ in false }, docked: true)
+            .environmentObject(data)
+            .environmentObject(MIDIMonitorConductor())
+    }
 }
 
