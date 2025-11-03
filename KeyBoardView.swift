@@ -153,13 +153,14 @@ struct KeyBoardView: View {
           Panel3DBackground()
         )
         .padding(.horizontal)
+        .padding(.bottom, 8) // Add gap between control panel and piano rail
         
         // Piano rail separator tying panel and keyboard together
         PianoRail(is3D: is3DMode)
           .frame(height: 14)
           .padding(.horizontal, 22)
-          .padding(.top, -4)
-          .padding(.bottom, 2)
+          .padding(.top, -8)
+          .padding(.bottom, 8)
 
         // Keyboard View (2D or 3D)
         GeometryReader { proxy in
@@ -189,43 +190,36 @@ struct KeyBoardView: View {
                 externalVelocities: $externalVelocities,
                 scientificLabel: scientificLabel
               )
-              // Clip the 3D content so the border is visible and clean
-              .clipShape(RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous))
               .frame(height: responsiveHeight)
             }
             .padding(.horizontal, 8) // thinner left/right bezel to match 2D
             .padding(.bottom, 10)
             .background(
+              // Add the same styled background as 2D mode
               ZStack {
-                // Unified chassis color to match the top panel (same as 2D)
-                RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                // Unified chassis color to match the top panel
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                   .fill(Color("MeterPanelColor"))
 
-                // Subtle vertical sheen similar to Panel3DBackground (same as 2D)
-                RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                // Subtle vertical sheen similar to Panel3DBackground
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                   .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
                   .blendMode(.softLight)
 
-                // Inner bottom lip for depth (same as 2D)
-                VStack {
-                  Spacer()
-                  RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
-                    .frame(height: 8)
-                    .padding(.horizontal, 8)
-                    .opacity(0.9)
-                }
-                .padding(.vertical, 6)
+                // Add subtle purple tint to match design language (reduced intensity) 
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                  .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+                  .blendMode(.plusLighter)
               }
             )
             .overlay(
-              // Edge highlight (same as 2D)
-              RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+              // Edge highlight
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
                 .blendMode(.overlay)
             )
             .overlay(
-              RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(
                   LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
                                  startPoint: .topLeading, endPoint: .bottomTrailing),
@@ -235,7 +229,7 @@ struct KeyBoardView: View {
                 .opacity(0.9)
             )
             .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
-            .frame(height: responsiveHeight + 18)
+            .frame(height: responsiveHeight)
           } else {
             ZStack {
               // Dark keybed background constrained to keyboard height
@@ -295,16 +289,10 @@ struct KeyBoardView: View {
                   .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
                   .blendMode(.softLight)
 
-                // Inner bottom lip for depth
-                VStack {
-                  Spacer()
-                  RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
-                    .frame(height: 8)
-                    .padding(.horizontal, 8)
-                    .opacity(0.9)
-                }
-                .padding(.vertical, 6)
+                // Add subtle purple tint to match design language (reduced intensity)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                  .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+                  .blendMode(.plusLighter)
               }
             )
             .overlay(
@@ -362,6 +350,19 @@ struct KeyBoardView: View {
           pressedCorrectness.removeValue(forKey: note)
       }
     }
+//    .background(
+//      // Sophisticated background gradient behind everything
+//      LinearGradient(
+//        colors: [
+//          Color(red: 0.12, green: 0.10, blue: 0.16), // Deep purple-gray at top
+//          Color(red: 0.08, green: 0.08, blue: 0.12), // Darker blue-gray in middle
+//          Color(red: 0.06, green: 0.06, blue: 0.10)  // Near black at bottom
+//        ],
+//        startPoint: .top,
+//        endPoint: .bottom
+//      )
+//      .ignoresSafeArea(.all) // Fill entire canvas
+//    )
   }
 }
 
@@ -437,17 +438,6 @@ struct Panel3DBackground: View {
         RoundedRectangle(cornerRadius: corner, style: .continuous)
           .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
           .blendMode(.overlay)
-
-        // Bottom lip inside the panel (gives a recessed look for the keyboard slot)
-        VStack {
-          Spacer()
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
-            .frame(height: max(6, proxy.size.height * 0.06))
-            .padding(.horizontal, 8)
-            .opacity(0.8)
-        }
-        .padding(.vertical, 6)
         
         // Angled sheen and inner edge to suggest panel tilt
         GeometryReader { g in
@@ -543,8 +533,8 @@ struct PianoRail: View {
       }
       .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
       .background(
-        ChromeStanchions(upLength: 16, downLength: is3D ? 26 : 20, barWidth: 8, spacing: 54)
-          .padding(.vertical, is3D ? -12 : -8) // let bars extend above and below the rail
+        ChromeStanchions(upLength: is3D ? 16 : 16, downLength: is3D ? 24 : 22, barWidth: 8, spacing: 54)
+          .padding(.vertical, is3D ? -20 : -19) // let bars extend above and below the rail
       )
     }
   }
@@ -603,18 +593,8 @@ struct ChromeStanchions: View {
     var body: some View {
       GeometryReader { size in
         ZStack {
-          // Backplate behind keys
-          LinearGradient(colors: [Color.black, Color.black.opacity(0.92), Color.black.opacity(0.88)], startPoint: .top, endPoint: .bottom)
-          // Subtle top lip shadow right under the rail
-          VStack(spacing: 0) {
-            Rectangle()
-              .fill(Color.black.opacity(0.70))
-              .frame(height: 2)
-            Rectangle()
-              .fill(Color.white.opacity(0.04))
-              .frame(height: 1)
-            Spacer()
-          }
+          // Very subtle background - almost transparent
+          Color.clear
         }
       }
     }
@@ -644,11 +624,11 @@ struct Keyboard3DView: View {
 
     // Shared layout constants so drawing and hit-testing always match
 // CHANGED here:
-    private let backScale: CGFloat = 0.80              // Back edge is 80% of front width (changed from 0.85)
+    private let backScale: CGFloat = 0.90              // Less aggressive perspective (changed from 0.80)
     private let caseHeight: CGFloat = 26               // changed from 36
     private let whiteFrontHeight: CGFloat = 24          // changed from 22
-    private let blackFrontHeight: CGFloat = 18          // changed from 16
-    private let blackKeyElevation: CGFloat = -18        // changed from -14
+    private let blackFrontHeight: CGFloat = 12          // changed from 18
+    private let blackKeyElevation: CGFloat = -8        // changed from -18
     
     // 3D appearance settings - realistic overhead perspective
     private let viewingAngle: Double = 35.0         // Degrees from horizontal
@@ -657,45 +637,40 @@ struct Keyboard3DView: View {
     private let blackKeyHeight: CGFloat = 90.0      // Black key length  
     private let keyThickness: CGFloat = 2.0         // Key thickness for 3D effect
 
+// CHANGED here: More dramatic perspective settings to match reference image
+    private let vanishFactor: CGFloat = 0.15   // Strong perspective distortion for dramatic tapering
+    private let tiltBias: CGFloat = 0.08       // More pronounced vertical tilt across back edge
+
     // Hit-testing / depth defaults
     private let whiteFrontGuardRatio: CGFloat = 0.10 // front 10% is always white-only for taps
     private let frontFaceReserveFactor: CGFloat = 0.28
-    // Removed: private let blackKeyDepthRatio: CGFloat = 0.76
 
-    private func scaleFor(size: CGSize) -> CGFloat {
-        // Designed around ~220pt height; clamp to keep proportions sane
-        let baseline: CGFloat = 220
-        let s = size.height / baseline
-        return min(max(s, 0.6), 1.4)
+    // Perspective transformation for more realistic "sitting in front of keyboard" view
+    private func backX(forFrontX x: CGFloat, totalWidth: CGFloat) -> CGFloat {
+        let centerX = totalWidth / 2
+        let offsetFromCenter = x - centerX
+        // Stronger convergence toward center for more dramatic perspective
+        let tapered = centerX + offsetFromCenter * (1.0 - vanishFactor)
+        return tapered
     }
-    
-    private func blackDepthRatio(for size: CGSize) -> CGFloat {
-        let s = scaleFor(size: size) // ~0.6 ... 1.4
-        return 0.62 + 0.06 * min(max(s, 0.6), 1.0) // 0.62 ... 0.68
-    }
-    
-    private func isBlackKey(_ midi: Int) -> Bool {
-        let note = midi % 12
-        return [1, 3, 6, 8, 10].contains(note) // C#, D#, F#, G#, A#
-    }
-    
-    private func noteName(from midiNote: Int) -> String {
-        guard (0...127).contains(midiNote) else { return "—" }
-        let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
-        let octave = (midiNote / 12) - 1
-        return names[midiNote % 12] + String(octave)
+
+    // Enhanced vertical transformation for realistic viewing angle
+    private func backY(baseY: CGFloat, totalWidth: CGFloat, atFrontX x: CGFloat) -> CGFloat {
+        let centerX = totalWidth / 2
+        let distanceFromCenter = abs(x - centerX) / (totalWidth / 2) // 0.0 at center, 1.0 at edges
+        
+        // Add both tilt and "lift" effect - keyboard appears to lift away from viewer
+        let tiltOffset = distanceFromCenter * tiltBias * 25 // Increased tilt scaling
+        let liftOffset = 15.0 // Constant lift to make back edge appear higher
+        
+        return baseY - tiltOffset - liftOffset
     }
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Much darker background for dramatic contrast
-                LinearGradient(
-                    colors: [Color.black, Color.black.opacity(0.85), Color.black.opacity(0.6)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                // Changed from dark gradient background to clear
+                Color.clear
                 
                 Canvas { context, size in
                     drawRealistic3DKeyboard(context: context, size: size)
@@ -759,40 +734,59 @@ struct Keyboard3DView: View {
         let blackFrontH = blackFrontHeight * s
         let caseH = caseHeight * s
         let elevation = blackKeyElevation * s
-        let whiteShadowOffset = 8 * s
-        let blackShadowOffset = 9 * s
+        // Shadow variables removed - no longer needed
 
         // Inserted bottom margin constant
         let bottomMargin = max(16, whiteFrontH * 1.25) // larger reserve so front faces never clip
 
-        // Subtle perspective and placement similar to the reference photo
+        // Enhanced perspective for "sitting at keyboard" viewing angle
         // Show more depth while still guaranteeing the white-key front faces are visible
-        let a: CGFloat = 0.20 / 0.72 // relationship between keyboardY and depth
+        let a: CGFloat = 0.25 / 0.75 // Increased relationship between keyboardY and depth for more dramatic angle
         let preferredDepth = totalHeight // allow as much depth as available; clamp below prevents clipping
-        let maxDepthByHeight = max(60, (totalHeight - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
+        let maxDepthByHeight = max(80, (totalHeight - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
         let keyboardDepth: CGFloat = min(preferredDepth, maxDepthByHeight)
+        let keyboardY = keyboardDepth * a // This positions the back edge higher up
 
         // Keyboard case/background
-        drawPerspectiveKeyboardCase(context: context, size: size, keyboardY: keyboardDepth * 0.20 / 0.72, depth: keyboardDepth, caseHeight: caseH)
+        drawPerspectiveKeyboardCase(context: context, size: size, keyboardY: keyboardY, depth: keyboardDepth, caseHeight: caseH)
 
-        // Under-panel shadow to increase overhang
-// CHANGED here:
-        var underShadow = Path()
-        underShadow.move(to: CGPoint(x: 0, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
-        underShadow.addLine(to: CGPoint(x: totalWidth, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
-        context.stroke(underShadow, with: .color(Color.black.opacity(0.45)), lineWidth: max(1.5, caseH * 0.10))
+        // Removed under-panel shadow line as it was too prominent
 
-        // Fill white key area to avoid gaps (uses the backScale constant)
-        let backWidth = totalWidth * backScale
-        let backXOffset = (totalWidth - backWidth) / 2
+        // Fill white key area with perspective gradient (keeps background tapered while keys stay rectangular)
+        let backLeftX = backX(forFrontX: 0, totalWidth: totalWidth)
+        let backRightX = backX(forFrontX: totalWidth, totalWidth: totalWidth)
+        let backBaseY = keyboardY
+        let backLeftY = backY(baseY: backBaseY, totalWidth: totalWidth, atFrontX: 0)
+        let backRightY = backY(baseY: backBaseY, totalWidth: totalWidth, atFrontX: totalWidth)
 
         var whiteKeyArea = Path()
-        whiteKeyArea.move(to: CGPoint(x: 0, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth))
-        whiteKeyArea.addLine(to: CGPoint(x: totalWidth, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth))
-        whiteKeyArea.addLine(to: CGPoint(x: backXOffset + backWidth, y: keyboardDepth * 0.20 / 0.72))
-        whiteKeyArea.addLine(to: CGPoint(x: backXOffset, y: keyboardDepth * 0.20 / 0.72))
+        whiteKeyArea.move(to: CGPoint(x: 0, y: keyboardY + keyboardDepth))
+        whiteKeyArea.addLine(to: CGPoint(x: totalWidth, y: keyboardY + keyboardDepth))
+        whiteKeyArea.addLine(to: CGPoint(x: backRightX, y: backRightY))
+        whiteKeyArea.addLine(to: CGPoint(x: backLeftX, y: backLeftY))
         whiteKeyArea.closeSubpath()
-        context.fill(whiteKeyArea, with: .color(Color.white))
+        
+        // Use a gradient that suggests perspective depth
+        let perspectiveGradient: GraphicsContext.Shading = .linearGradient(
+            Gradient(colors: [Color.white.opacity(0.95), Color.white, Color.white.opacity(0.95)]),
+            startPoint: CGPoint(x: 0, y: keyboardY + keyboardDepth),
+            endPoint: CGPoint(x: totalWidth, y: keyboardY + keyboardDepth)
+        )
+        // Add perspective shadow overlay to enhance depth illusion
+        var shadowOverlay = Path()
+        shadowOverlay.move(to: CGPoint(x: 0, y: keyboardY + keyboardDepth))
+        shadowOverlay.addLine(to: CGPoint(x: totalWidth, y: keyboardY + keyboardDepth))
+        shadowOverlay.addLine(to: CGPoint(x: backRightX, y: backRightY))
+        shadowOverlay.addLine(to: CGPoint(x: backLeftX, y: backLeftY))
+        shadowOverlay.closeSubpath()
+        
+        let shadowGradient: GraphicsContext.Shading = .radialGradient(
+            Gradient(colors: [Color.black.opacity(0.02), Color.black.opacity(0.08), Color.black.opacity(0.02)]),
+            center: CGPoint(x: totalWidth/2, y: keyboardY + keyboardDepth/2),
+            startRadius: 0,
+            endRadius: totalWidth * 0.8
+        )
+        context.fill(shadowOverlay, with: shadowGradient)
 
         // Draw white keys first (back to front for proper layering)
         let whiteKeys = (lowNote...highNote).filter { !isBlackKey($0) }
@@ -807,25 +801,24 @@ struct Keyboard3DView: View {
                 context: context,
                 midi: midi,
                 x: x,
-                width: keySpacing - 0.5,
-                keyboardY: keyboardDepth * 0.20 / 0.72,
+                width: keySpacing - 1.0, // Ensure there's always a gap between keys
+                keyboardY: keyboardY,
                 keyboardDepth: keyboardDepth,
                 viewDistance: 200,
                 whiteFrontHeight: whiteFrontH,
-                shadowOffset: whiteShadowOffset
+                totalWidth: totalWidth
             )
         }
 
         // Subtle separators on the top surface between white keys
         for index in 1..<whiteKeys.count {
             let x = CGFloat(index) * keySpacing - 0.25
-            let frontPoint = CGPoint(x: x, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth)
-            let backRatio = (x - backXOffset) / totalWidth
-            let backX = backXOffset + backWidth * backRatio
-            let backPoint = CGPoint(x: backX, y: keyboardDepth * 0.20 / 0.72)
+            let frontPoint = CGPoint(x: x, y: keyboardY + keyboardDepth)
+            let backXSep = backX(forFrontX: x, totalWidth: totalWidth)
+            let backYSep = backY(baseY: keyboardY, totalWidth: totalWidth, atFrontX: x)
             var separator = Path()
             separator.move(to: frontPoint)
-            separator.addLine(to: backPoint)
+            separator.addLine(to: CGPoint(x: backXSep, y: backYSep))
             context.stroke(separator, with: .color(Color.black.opacity(0.06)), lineWidth: 0.35)
         }
 
@@ -841,13 +834,13 @@ struct Keyboard3DView: View {
                     midi: midi,
                     x: x,
                     width: blackWidth,
-                    keyboardY: keyboardDepth * 0.20 / 0.72,
+                    keyboardY: keyboardY,
                     keyboardDepth: keyboardDepth,
                     viewDistance: 200,
                     blackFrontHeight: blackFrontH,
                     elevation: elevation,
                     blackDepthRatio: bdr,
-                    shadowOffset: blackShadowOffset
+                    totalWidth: totalWidth
                 )
             }
         }
@@ -856,7 +849,7 @@ struct Keyboard3DView: View {
         // We draw these last so they sit on top of the front faces
         for index in 1..<whiteKeys.count {
             let x = CGFloat(index) * keySpacing
-            let frontY = keyboardDepth * 0.20 / 0.72 + keyboardDepth
+            let frontY = keyboardY + keyboardDepth
             let grooveHeight = whiteFrontH
             var groove = Path()
             groove.move(to: CGPoint(x: x, y: frontY))
@@ -866,73 +859,8 @@ struct Keyboard3DView: View {
     }
     
     private func drawPerspectiveKeyboardCase(context: GraphicsContext, size: CGSize, keyboardY: CGFloat, depth: CGFloat, caseHeight: CGFloat) {
-        let caseColor = Color.black
-
-        let backWidth = size.width * backScale
-        let backXOffset = (size.width - backWidth) / 2
-
-        // Main case body
-        var caseBody = Path()
-        caseBody.move(to: CGPoint(x: 0, y: keyboardY + depth))
-        caseBody.addLine(to: CGPoint(x: size.width, y: keyboardY + depth))
-        caseBody.addLine(to: CGPoint(x: backXOffset + backWidth, y: keyboardY))
-        caseBody.addLine(to: CGPoint(x: backXOffset, y: keyboardY))
-        caseBody.closeSubpath()
-        context.fill(caseBody, with: .color(caseColor))
-
-        // Rim
-        var caseFrame = Path()
-        caseFrame.move(to: CGPoint(x: 0, y: keyboardY + depth + caseHeight))
-        caseFrame.addLine(to: CGPoint(x: size.width, y: keyboardY + depth + caseHeight))
-        caseFrame.addLine(to: CGPoint(x: backXOffset + backWidth, y: keyboardY + caseHeight))
-        caseFrame.addLine(to: CGPoint(x: backXOffset, y: keyboardY + caseHeight))
-        caseFrame.closeSubpath()
-        context.fill(caseFrame, with: .linearGradient(
-            Gradient(colors: [Color(red: 0.18, green: 0.18, blue: 0.18), Color(red: 0.10, green: 0.10, blue: 0.10)]),
-            startPoint: CGPoint(x: 0, y: keyboardY + depth + caseHeight),
-            endPoint: CGPoint(x: 0, y: keyboardY + caseHeight)
-        ))
-
-        // Thin gap shadow to separate panel from keys
-        var gap = Path()
-        gap.move(to: CGPoint(x: 0, y: keyboardY + depth + caseHeight + 1))
-        gap.addLine(to: CGPoint(x: size.width, y: keyboardY + depth + caseHeight + 1))
-        context.stroke(gap, with: .color(Color.black.opacity(0.35)), lineWidth: 1)
-
-        // Sides
-        var leftSide = Path()
-        leftSide.move(to: CGPoint(x: 0, y: keyboardY + depth))
-        leftSide.addLine(to: CGPoint(x: backXOffset, y: keyboardY))
-        leftSide.addLine(to: CGPoint(x: backXOffset, y: keyboardY + caseHeight))
-        leftSide.addLine(to: CGPoint(x: 0, y: keyboardY + depth + caseHeight))
-        leftSide.closeSubpath()
-
-        var rightSide = Path()
-        rightSide.move(to: CGPoint(x: size.width, y: keyboardY + depth))
-        rightSide.addLine(to: CGPoint(x: backXOffset + backWidth, y: keyboardY))
-        rightSide.addLine(to: CGPoint(x: backXOffset + backWidth, y: keyboardY + caseHeight))
-        rightSide.addLine(to: CGPoint(x: size.width, y: keyboardY + depth + caseHeight))
-        rightSide.closeSubpath()
-
-        context.fill(leftSide, with: .color(Color(red: 0.12, green: 0.12, blue: 0.12)))
-        context.fill(rightSide, with: .color(Color(red: 0.08, green: 0.08, blue: 0.08)))
-
-        // Corner vignettes for perspective
-        var leftVignette = Path()
-        leftVignette.addRoundedRect(in: CGRect(x: 0, y: keyboardY + depth, width: max(24, size.width * 0.04), height: caseHeight + 8), cornerSize: CGSize(width: 12, height: 12))
-        context.fill(leftVignette, with: .linearGradient(
-          Gradient(colors: [Color.black.opacity(0.18), .clear]),
-          startPoint: CGPoint(x: 0, y: keyboardY + depth + caseHeight/2),
-          endPoint: CGPoint(x: max(24, size.width * 0.04), y: keyboardY + depth + caseHeight/2)
-        ))
-
-        var rightVignette = Path()
-        rightVignette.addRoundedRect(in: CGRect(x: size.width - max(24, size.width * 0.04), y: keyboardY + depth, width: max(24, size.width * 0.04), height: caseHeight + 8), cornerSize: CGSize(width: 12, height: 12))
-        context.fill(rightVignette, with: .linearGradient(
-          Gradient(colors: [.clear, Color.black.opacity(0.18)]),
-          startPoint: CGPoint(x: size.width - max(24, size.width * 0.04), y: keyboardY + depth + caseHeight/2),
-          endPoint: CGPoint(x: size.width, y: keyboardY + depth + caseHeight/2)
-        ))
+        // Remove the dark keyboard case - make it transparent or very light
+        // No case drawing needed
     }
     
     private func drawPerspective3DWhiteKey(
@@ -944,18 +872,26 @@ struct Keyboard3DView: View {
         keyboardDepth: CGFloat,
         viewDistance: CGFloat,
         whiteFrontHeight: CGFloat,
-        shadowOffset: CGFloat
+        totalWidth: CGFloat
     ) {
         let isPressed = conductor.activeNotes.contains(midi)
         let pressDepth: CGFloat = isPressed ? 10 : 0
 
-        // Subtle perspective
-        let backWidth = width * backScale
-        let backXOffset = (width - backWidth) / 2
-
         let keyStartY = keyboardY + pressDepth
         let keyEndY = keyboardY + keyboardDepth + pressDepth
         let keyHeight: CGFloat = whiteFrontHeight
+
+        // Keep keys rectangular to avoid artifacts - only apply subtle scaling
+        let keyScale = 1.0 - (abs(x + width/2 - totalWidth/2) / (totalWidth/2)) * 0.05 // 5% max scale variation
+        let scaledWidth = width * keyScale
+        let scaledX = x + (width - scaledWidth) / 2 // center the scaled key
+        
+        let xL = scaledX
+        let xR = scaledX + scaledWidth
+        let backXL = xL  // Keep keys rectangular
+        let backXR = xR  // Keep keys rectangular  
+        let backYL = keyStartY  // Keep keys rectangular
+        let backYR = keyStartY  // Keep keys rectangular
 
         // State coloring (tint when pressed and correctness known)
         let persisted: Bool? = pressedCorrectness[midi]
@@ -968,29 +904,23 @@ struct Keyboard3DView: View {
         let baseWhiteFront = Color(white: 0.86)
         let baseWhiteSide = Color(white: 0.80)
 
-        // Removed tintTop, tintFront, tintSide declarations
-        
-        // Shadows
-        var shadow = Path()
-        shadow.move(to: CGPoint(x: x + shadowOffset, y: keyEndY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + width + shadowOffset, y: keyEndY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + backXOffset + backWidth + shadowOffset, y: keyStartY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + backXOffset + shadowOffset, y: keyStartY + keyHeight + shadowOffset))
-        shadow.closeSubpath()
-        context.fill(shadow, with: .color(Color.black.opacity(0.35)))
+        // Skip shadows for now - they're causing visual artifacts due to perspective distortion
 
-        // Top surface
+        // Top surface (tapered) - improved shading
         var keyTop = Path()
-        keyTop.move(to: CGPoint(x: x, y: keyEndY))
-        keyTop.addLine(to: CGPoint(x: x + width, y: keyEndY))
-        keyTop.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY))
-        keyTop.addLine(to: CGPoint(x: x + backXOffset, y: keyStartY))
+        keyTop.move(to: CGPoint(x: xL, y: keyEndY))
+        keyTop.addLine(to: CGPoint(x: xR, y: keyEndY))
+        keyTop.addLine(to: CGPoint(x: backXR, y: backYR))
+        keyTop.addLine(to: CGPoint(x: backXL, y: backYL))
         keyTop.closeSubpath()
+        
+        // More realistic white key top gradient - slightly warmer whites
         let topFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [baseWhiteTop, Color(white: 0.92)]),
-            startPoint: CGPoint(x: x, y: keyEndY),
-            endPoint: CGPoint(x: x, y: keyStartY)
+            Gradient(colors: [Color(white: 0.99), Color(white: 0.96), Color(white: 0.92)]),
+            startPoint: CGPoint(x: xL, y: keyEndY),
+            endPoint: CGPoint(x: backXL, y: backYL)
         )
+        
         if isPressed {
             let pressedColor: Color = effectiveCorrect ? .green : .red
             context.fill(keyTop, with: .color(pressedColor))
@@ -998,59 +928,61 @@ struct Keyboard3DView: View {
             context.fill(keyTop, with: topFill)
         }
 
-        // Front face
+        // Front face - enhanced gradient for better 3D depth
         var keyFront = Path()
-        keyFront.move(to: CGPoint(x: x, y: keyEndY))
-        keyFront.addLine(to: CGPoint(x: x + width, y: keyEndY))
-        keyFront.addLine(to: CGPoint(x: x + width, y: keyEndY + keyHeight))
-        keyFront.addLine(to: CGPoint(x: x, y: keyEndY + keyHeight))
+        keyFront.move(to: CGPoint(x: xL, y: keyEndY))
+        keyFront.addLine(to: CGPoint(x: xR, y: keyEndY))
+        keyFront.addLine(to: CGPoint(x: xR, y: keyEndY + keyHeight))
+        keyFront.addLine(to: CGPoint(x: xL, y: keyEndY + keyHeight))
         keyFront.closeSubpath()
+        
+        // More dramatic front face gradient for better 3D appearance
         let frontFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [baseWhiteFront, Color(white: 0.72)]),
-            startPoint: CGPoint(x: x, y: keyEndY),
-            endPoint: CGPoint(x: x, y: keyEndY + keyHeight)
+            Gradient(colors: [Color(white: 0.98), Color(white: 0.85), Color(white: 0.72), Color(white: 0.78)]),
+            startPoint: CGPoint(x: xL, y: keyEndY),
+            endPoint: CGPoint(x: xL, y: keyEndY + keyHeight)
         )
         context.fill(keyFront, with: frontFill)
-        // Removed tintFront fill line here
 
-        // Right side
+        // Right side (tapered) - more realistic shading
         var keyRight = Path()
-        keyRight.move(to: CGPoint(x: x + width, y: keyEndY))
-        keyRight.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY))
-        keyRight.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight))
-        keyRight.addLine(to: CGPoint(x: x + width, y: keyEndY + keyHeight))
+        keyRight.move(to: CGPoint(x: xR, y: keyEndY))
+        keyRight.addLine(to: CGPoint(x: backXR, y: backYR))
+        keyRight.addLine(to: CGPoint(x: backXR, y: backYR + keyHeight))
+        keyRight.addLine(to: CGPoint(x: xR, y: keyEndY + keyHeight))
         keyRight.closeSubpath()
+        
+        // Darker side to show depth and dimension
         let sideFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [baseWhiteSide, Color(white: 0.70)]),
-            startPoint: CGPoint(x: x + width, y: keyEndY),
-            endPoint: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight)
+            Gradient(colors: [Color(white: 0.82), Color(white: 0.75), Color(white: 0.68)]),
+            startPoint: CGPoint(x: xR, y: keyEndY),
+            endPoint: CGPoint(x: backXR, y: backYR + keyHeight)
         )
         context.fill(keyRight, with: sideFill)
-        // Removed tintSide fill line here
 
-        // Subtle highlight on top
+        // Subtle highlight on top - more realistic
         var highlight = Path()
-        let inset: CGFloat = width * 0.08
-        highlight.move(to: CGPoint(x: x + inset, y: keyEndY - 2))
-        highlight.addLine(to: CGPoint(x: x + width - inset, y: keyEndY - 2))
-        highlight.addLine(to: CGPoint(x: x + backXOffset + backWidth - inset/3, y: keyStartY - 2))
-        highlight.addLine(to: CGPoint(x: x + backXOffset + inset/3, y: keyStartY - 2))
+        let inset: CGFloat = width * 0.12
+        highlight.move(to: CGPoint(x: xL + inset, y: keyEndY - 1))
+        highlight.addLine(to: CGPoint(x: xR - inset, y: keyEndY - 1))
+        highlight.addLine(to: CGPoint(x: backXR - inset * 0.5, y: backYR - 1))
+        highlight.addLine(to: CGPoint(x: backXL + inset * 0.5, y: backYL - 1))
         highlight.closeSubpath()
         if !isPressed {
-            context.fill(highlight, with: .color(Color.white.opacity(0.25)))
+            context.fill(highlight, with: .color(Color.white.opacity(0.15))) // More subtle
         }
 
-        // Outlines
-        context.stroke(keyTop, with: .color(Color.black.opacity(0.12)), lineWidth: 0.5)
-        context.stroke(keyFront, with: .color(Color.black.opacity(0.18)), lineWidth: 0.5)
-        context.stroke(keyRight, with: .color(Color.black.opacity(0.15)), lineWidth: 0.5)
+        // More realistic outlines
+        context.stroke(keyTop, with: .color(Color.black.opacity(0.08)), lineWidth: 0.4)
+        context.stroke(keyFront, with: .color(Color.black.opacity(0.12)), lineWidth: 0.4)
+        context.stroke(keyRight, with: .color(Color.black.opacity(0.10)), lineWidth: 0.3)
 
         // Note: front faces are guaranteed visible by depth clamp above
         // Label (only C's)
         let pitch = Pitch(intValue: midi)
         let label = scientificLabel(pitch)
         if !label.isEmpty {
-            let labelPoint = CGPoint(x: x + width/2, y: keyEndY - 16)
+            let labelPoint = CGPoint(x: xL + width/2, y: keyEndY - 16)
             let labelText = Text(label)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Color.secondary)
@@ -1069,20 +1001,29 @@ struct Keyboard3DView: View {
         blackFrontHeight: CGFloat,
         elevation: CGFloat,
         blackDepthRatio: CGFloat,
-        shadowOffset: CGFloat
+        totalWidth: CGFloat
     ) {
         let isPressed = conductor.activeNotes.contains(midi)
-        let pressDepth: CGFloat = isPressed ? 7 : 0
+        let pressDepth: CGFloat = isPressed ? 5 : 0
 
         let blackKeyDepth = keyboardDepth * blackDepthRatio
         let elevationOffset: CGFloat = elevation
 
-        let backWidth = width * backScale
-        let backXOffset = (width - backWidth) / 2
-
         let keyStartY = keyboardY + elevationOffset + pressDepth
         let keyEndY = keyboardY + blackKeyDepth + elevationOffset + pressDepth
         let keyHeight: CGFloat = blackFrontHeight
+
+        // Keep black keys rectangular to avoid artifacts - only apply subtle scaling  
+        let keyScale = 1.0 - (abs(x + width/2 - totalWidth/2) / (totalWidth/2)) * 0.08 // Slightly more scaling for black keys
+        let scaledWidth = width * keyScale
+        let scaledX = x + (width - scaledWidth) / 2 // center the scaled key
+        
+        let xL = scaledX
+        let xR = scaledX + scaledWidth
+        let backXL = xL  // Keep keys rectangular
+        let backXR = xR  // Keep keys rectangular
+        let backYL = keyStartY  // Keep keys rectangular  
+        let backYR = keyStartY  // Keep keys rectangular
 
         let persisted: Bool? = pressedCorrectness[midi]
         let effectiveCorrect: Bool = {
@@ -1094,29 +1035,23 @@ struct Keyboard3DView: View {
         let sideBase = Color(white: 0.06)
         let frontBase = Color(white: 0.04)
 
-        // Removed tintTop, tintSide, tintFront declarations
+        // Skip shadows for now - they're causing visual artifacts due to perspective distortion
 
-        // Shadow
-        var shadow = Path()
-        shadow.move(to: CGPoint(x: x + shadowOffset, y: keyEndY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + width + shadowOffset, y: keyEndY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + backXOffset + backWidth + shadowOffset, y: keyStartY + keyHeight + shadowOffset))
-        shadow.addLine(to: CGPoint(x: x + backXOffset + shadowOffset, y: keyStartY + keyHeight + shadowOffset))
-        shadow.closeSubpath()
-        context.fill(shadow, with: .color(Color.black.opacity(0.55)))
-
-        // Top
+        // Top - improved black key shading
         var keyTop = Path()
-        keyTop.move(to: CGPoint(x: x, y: keyEndY))
-        keyTop.addLine(to: CGPoint(x: x + width, y: keyEndY))
-        keyTop.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY))
-        keyTop.addLine(to: CGPoint(x: x + backXOffset, y: keyStartY))
+        keyTop.move(to: CGPoint(x: xL, y: keyEndY))
+        keyTop.addLine(to: CGPoint(x: xR, y: keyEndY))
+        keyTop.addLine(to: CGPoint(x: backXR, y: backYR))
+        keyTop.addLine(to: CGPoint(x: backXL, y: backYL))
         keyTop.closeSubpath()
+        
+        // More realistic black key top - subtle gradient
         let topFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [Color(white: 0.18), topBase]),
-            startPoint: CGPoint(x: x, y: keyEndY),
-            endPoint: CGPoint(x: x, y: keyStartY)
+            Gradient(colors: [Color(white: 0.15), Color(white: 0.08), Color(white: 0.05)]),
+            startPoint: CGPoint(x: xL, y: keyEndY),
+            endPoint: CGPoint(x: backXL, y: backYL)
         )
+        
         if isPressed {
             let pressedColor: Color = effectiveCorrect ? .green : .red
             context.fill(keyTop, with: .color(pressedColor))
@@ -1124,61 +1059,70 @@ struct Keyboard3DView: View {
             context.fill(keyTop, with: topFill)
         }
 
-        // Front
+        // Front - enhanced black front face with better shading
         var keyFront = Path()
-        keyFront.move(to: CGPoint(x: x, y: keyEndY))
-        keyFront.addLine(to: CGPoint(x: x + width, y: keyEndY))
-        keyFront.addLine(to: CGPoint(x: x + width, y: keyEndY + keyHeight))
-        keyFront.addLine(to: CGPoint(x: x, y: keyEndY + keyHeight))
+        keyFront.move(to: CGPoint(x: xL, y: keyEndY))
+        keyFront.addLine(to: CGPoint(x: xR, y: keyEndY))
+        keyFront.addLine(to: CGPoint(x: xR, y: keyEndY + keyHeight))
+        keyFront.addLine(to: CGPoint(x: xL, y: keyEndY + keyHeight))
         keyFront.closeSubpath()
+        
+        // More dramatic black key front gradient for better 3D depth
         let frontFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [frontBase, Color(white: 0.02)]),
-            startPoint: CGPoint(x: x, y: keyEndY),
-            endPoint: CGPoint(x: x, y: keyEndY + keyHeight)
+            Gradient(colors: [Color(white: 0.12), Color(white: 0.06), Color(white: 0.02), Color(white: 0.04)]),
+            startPoint: CGPoint(x: xL, y: keyEndY),
+            endPoint: CGPoint(x: xL, y: keyEndY + keyHeight)
         )
         context.fill(keyFront, with: frontFill)
-        // Removed tintFront fill line here
 
-        // Right side
+        // Right side - darker for depth
         var keyRight = Path()
-        keyRight.move(to: CGPoint(x: x + width, y: keyEndY))
-        keyRight.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY))
-        keyRight.addLine(to: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight))
-        keyRight.addLine(to: CGPoint(x: x + width, y: keyEndY + keyHeight))
+        keyRight.move(to: CGPoint(x: xR, y: keyEndY))
+        keyRight.addLine(to: CGPoint(x: backXR, y: backYR))
+        keyRight.addLine(to: CGPoint(x: backXR, y: backYR + keyHeight))
+        keyRight.addLine(to: CGPoint(x: xR, y: keyEndY + keyHeight))
         keyRight.closeSubpath()
+        
         let sideFill: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [sideBase, Color(white: 0.03)]),
-            startPoint: CGPoint(x: x + width, y: keyEndY),
-            endPoint: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight)
+            Gradient(colors: [Color(white: 0.05), Color(white: 0.02), Color(white: 0.01)]),
+            startPoint: CGPoint(x: xR, y: keyEndY),
+            endPoint: CGPoint(x: backXR, y: backYR + keyHeight)
         )
         context.fill(keyRight, with: sideFill)
-        // Removed tintSide fill line here
 
-        // Left side
+        // Left side - also add left side for better definition
         var keyLeft = Path()
-        keyLeft.move(to: CGPoint(x: x, y: keyEndY))
-        keyLeft.addLine(to: CGPoint(x: x + backXOffset, y: keyStartY))
-        keyLeft.addLine(to: CGPoint(x: x + backXOffset, y: keyStartY + keyHeight))
-        keyLeft.addLine(to: CGPoint(x: x, y: keyEndY + keyHeight))
+        keyLeft.move(to: CGPoint(x: xL, y: keyEndY))
+        keyLeft.addLine(to: CGPoint(x: backXL, y: backYL))
+        keyLeft.addLine(to: CGPoint(x: backXL, y: backYL + keyHeight))
+        keyLeft.addLine(to: CGPoint(x: xL, y: keyEndY + keyHeight))
         keyLeft.closeSubpath()
-        context.fill(keyLeft, with: sideFill)
+        
+        // Slightly lighter left side for subtle lighting difference
+        let leftSideFill: GraphicsContext.Shading = .linearGradient(
+            Gradient(colors: [Color(white: 0.06), Color(white: 0.03), Color(white: 0.02)]),
+            startPoint: CGPoint(x: xL, y: keyEndY),
+            endPoint: CGPoint(x: backXL, y: backYL + keyHeight)
+        )
+        context.fill(keyLeft, with: leftSideFill)
 
-        // Soft highlight when not pressed
+        // Subtle highlight when not pressed - more realistic
         if !isPressed {
             var highlight = Path()
-            highlight.move(to: CGPoint(x: x + width * 0.15, y: keyEndY - 1.5))
-            highlight.addLine(to: CGPoint(x: x + width * 0.85, y: keyEndY - 1.5))
-            highlight.addLine(to: CGPoint(x: x + backXOffset + backWidth * 0.85, y: keyStartY - 1.5))
-            highlight.addLine(to: CGPoint(x: x + backXOffset + backWidth * 0.15, y: keyStartY - 1.5))
+            let highlightInset = width * 0.2
+            highlight.move(to: CGPoint(x: xL + highlightInset, y: keyEndY - 1))
+            highlight.addLine(to: CGPoint(x: xR - highlightInset, y: keyEndY - 1))
+            highlight.addLine(to: CGPoint(x: backXR - highlightInset * 0.6, y: backYR - 1))
+            highlight.addLine(to: CGPoint(x: backXL + highlightInset * 0.6, y: backYL - 1))
             highlight.closeSubpath()
-            context.fill(highlight, with: .color(Color.white.opacity(0.06)))
+            context.fill(highlight, with: .color(Color.white.opacity(0.04))) // More subtle
         }
 
-        // Outlines
-        context.stroke(keyTop, with: .color(Color.white.opacity(0.18)), lineWidth: 0.4)
-        context.stroke(keyFront, with: .color(Color.white.opacity(0.14)), lineWidth: 0.4)
-        context.stroke(keyRight, with: .color(Color.white.opacity(0.12)), lineWidth: 0.4)
-        context.stroke(keyLeft, with: .color(Color.white.opacity(0.10)), lineWidth: 0.3)
+        // More subtle outlines for realistic look
+        context.stroke(keyTop, with: .color(Color.white.opacity(0.08)), lineWidth: 0.3)
+        context.stroke(keyFront, with: .color(Color.white.opacity(0.06)), lineWidth: 0.3)
+        context.stroke(keyRight, with: .color(Color.white.opacity(0.05)), lineWidth: 0.25)
+        context.stroke(keyLeft, with: .color(Color.white.opacity(0.04)), lineWidth: 0.2)
     }
     
     private func getBlackKeyPosition(midi: Int, whiteKeys: [Int]) -> Int? {
@@ -1270,16 +1214,6 @@ struct Keyboard3DView: View {
             if keyIndex >= 0 && keyIndex < whiteKeys.count {
                 let whiteKeyMidi = whiteKeys[keyIndex]
 
-// REPLACED BLOCK START
-//                // Check right-side black key above this white key
-//                let rightBlack = whiteKeyMidi + 1
-//                if isBlackKey(rightBlack) && rightBlack <= highNote {
-//                    let baseX = CGFloat(keyIndex) * keySpacing
-//                    let offsetX = getBlackKeyOffset(midi: rightBlack)
-//                    let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
-//                    let bxRight = bx + blackWidth * 1.14
-//                    if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return rightBlack }
-//                }
                 // Check right-side black key above this white key (centered over the gap)
                 let rightBlack = whiteKeyMidi + 1
                 if isBlackKey(rightBlack) && rightBlack <= highNote {
@@ -1288,21 +1222,7 @@ struct Keyboard3DView: View {
                     let halfWidth = blackWidth / 2
                     if clampedX >= centerX - halfWidth && clampedX <= centerX + halfWidth { return rightBlack }
                 }
-// REPLACED BLOCK END
 
-// REPLACED BLOCK START
-//                // Check left-side black key above the previous white key
-//                if keyIndex > 0 {
-//                    let leftWhite = whiteKeys[keyIndex - 1]
-//                    let leftBlack = leftWhite + 1
-//                    if isBlackKey(leftBlack) && leftBlack <= highNote {
-//                        let baseX = CGFloat(keyIndex - 1) * keySpacing
-//                        let offsetX = getBlackKeyOffset(midi: leftBlack)
-//                        let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
-//                        let bxRight = bx + blackWidth * 1.14
-//                        if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return leftBlack }
-//                    }
-//                }
                 // Check left-side black key above the previous white key (centered over the gap)
                 if keyIndex > 0 {
                     let leftWhite = whiteKeys[keyIndex - 1]
@@ -1314,7 +1234,6 @@ struct Keyboard3DView: View {
                         if clampedX >= centerX - halfWidth && clampedX <= centerX + halfWidth { return leftBlack }
                     }
                 }
-// REPLACED BLOCK END
             }
         }
         
@@ -1328,6 +1247,30 @@ struct Keyboard3DView: View {
             if keyIndex >= 0 && keyIndex < whiteKeys.count { return whiteKeys[keyIndex] }
         }
         return whiteKeys[nearestIndex]
+    }
+    
+    private func scaleFor(size: CGSize) -> CGFloat {
+        // Designed around ~220pt height; clamp to keep proportions sane
+        let baseline: CGFloat = 220
+        let s = size.height / baseline
+        return min(max(s, 0.6), 1.4)
+    }
+    
+    private func blackDepthRatio(for size: CGSize) -> CGFloat {
+        let s = scaleFor(size: size) // ~0.6 ... 1.4
+        return 0.58 + 0.06 * min(max(s, 0.6), 1.0) // 0.58 ... 0.64
+    }
+    
+    private func isBlackKey(_ midi: Int) -> Bool {
+        let note = midi % 12
+        return [1, 3, 6, 8, 10].contains(note) // C#, D#, F#, G#, A#
+    }
+    
+    private func noteName(from midiNote: Int) -> String {
+        guard (0...127).contains(midiNote) else { return "—" }
+        let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        let octave = (midiNote / 12) - 1
+        return names[midiNote % 12] + String(octave)
     }
 }
 

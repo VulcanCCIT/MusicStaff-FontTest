@@ -542,115 +542,110 @@ struct ContentView: View {
 
      // Removed inline KeyBoardView here per instructions
 
-      // Staff and note drawing
-      Canvas { context, size in
-        // Center the entire staff/note drawing within the canvas
-        let centerX = size.width / 2
-        let centerY = size.height / 2
-        let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
-        let offsetX = centerX - noteX
-        let offsetY = centerY - originalGroupMidY
-        context.translateBy(x: offsetX, y: offsetY)
+      // Staff and note drawing (panel removed)
+      VStack(spacing: 12) {
+        Canvas { context, size in
+          // Center the entire staff/note drawing within the canvas
+          let centerX = size.width / 2
+          let centerY = size.height / 2
+          let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
+          let offsetX = centerX - noteX
+          let offsetY = centerY - originalGroupMidY
+          context.translateBy(x: offsetX, y: offsetY)
 
-        // Draw both staffs
-        context.draw(trebleStaff, at: trebleStaffPoint)
-        context.draw(bassStaff, at: bassStaffPoint)
+          // Add subtle shadow to improve contrast on dark background
+          context.addFilter(.shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 1))
 
-        if showDebugOverlays {
-          // Draw staff line guides (green) for both staffs
-          let stroke: CGFloat = 0.5
-          let trebleYs = vm.staffLineYs(for: .treble)
-          for y in trebleYs {
-            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
-            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+          // Draw both staffs
+          context.draw(trebleStaff, at: trebleStaffPoint)
+          context.draw(bassStaff, at: bassStaffPoint)
+
+          if showDebugOverlays {
+            // Draw staff line guides (green) for both staffs
+            let stroke: CGFloat = 0.5
+            let trebleYs = vm.staffLineYs(for: .treble)
+            for y in trebleYs {
+              let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+              context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+            }
+            let bassYs = vm.staffLineYs(for: .bass)
+            for y in bassYs {
+              let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+              context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+            }
+
+            // Draw computed ledger line positions (red), centered on Y
+            let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+            for y in ledgerYs {
+              let stroke: CGFloat = 0.75
+              let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
+              context.fill(Path(rect), with: .color(.red.opacity(0.7)))
+            }
+
+            // Draw the computed note center (blue crosshair)
+            let ny = vm.currentY
+            let crossW: CGFloat = 10
+            let crossH: CGFloat = 10
+            let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
+            let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
+            context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+            context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
           }
-          let bassYs = vm.staffLineYs(for: .bass)
-          for y in bassYs {
-            let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
-            context.fill(Path(rect), with: .color(.green.opacity(0.8)))
-          }
 
-          // Draw computed ledger line positions (red), centered on Y
+          // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
           let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+          let ledgerLength: CGFloat = lineWidth // reuse approximate glyph width as the visual length
+          let strokeWidth: CGFloat = 1.2
           for y in ledgerYs {
-            let stroke: CGFloat = 0.75
-            let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
-            context.fill(Path(rect), with: .color(.red.opacity(0.7)))
+            var p = Path()
+            p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
+            p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
+            context.stroke(p, with: .color(.white.opacity(0.9)), lineWidth: strokeWidth)
           }
 
-          // Draw the computed note center (blue crosshair)
-          let ny = vm.currentY
-          let crossW: CGFloat = 10
-          let crossH: CGFloat = 10
-          let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
-          let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
-          context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
-          context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+          // Draw accidental if needed just to the left of the note
+          let acc = vm.currentNote.accidental
+          let notePoint = CGPoint(x: noteX, y: vm.currentY)
+          let noteText = currentNoteSymbol.text()
+          if acc == "♯" {
+            let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+            context.draw(sharpText, at: accPoint, anchor: .center)
+          } else if acc == "♭" {
+            let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+            context.draw(flatText, at: accPoint, anchor: .center)
+          } else if acc == "♮" {
+            let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+            context.draw(naturalText, at: accPoint, anchor: .center)
+          }
+          context.draw(noteText, at: notePoint, anchor: .center)
+        }
+        .frame(height: 320)
+        .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
+
+        // Labels for clef, note name and MIDI code
+        HStack(spacing: 12) {
+          Text("Clef:")
+          Text(vm.currentClef == .treble ? "Treble" : "Bass")
+          Text("Note:")
+          Text(vm.currentNote.name).monospaced()
+          Text("MIDI:")
+          Text(String(vm.currentNote.midi)).monospaced()
         }
 
-        // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
-        let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
-        let ledgerLength: CGFloat = lineWidth // reuse approximate glyph width as the visual length
-        let strokeWidth: CGFloat = 1.2
-        for y in ledgerYs {
-          var p = Path()
-          p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
-          p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
-          context.stroke(p, with: .color(.primary), lineWidth: strokeWidth)
+        // Received values from MIDI to compare with the random note above
+        HStack(spacing: 12) {
+          Text("Received Clef:")
+          Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
+          Text("Received Note:")
+          Text(noteName(from: conductor.data.noteOn))
+            .monospaced()
+          Text("Received MIDI:")
+          Text(String(conductor.data.noteOn))
+            .monospaced()
         }
-
-        // Draw accidental if needed just to the left of the note
-        let acc = vm.currentNote.accidental
-        let notePoint = CGPoint(x: noteX, y: vm.currentY)
-        let noteText = currentNoteSymbol.text()
-        if acc == "♯" {
-          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-          context.draw(sharpText, at: accPoint, anchor: .center)
-        } else if acc == "♭" {
-          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-          context.draw(flatText, at: accPoint, anchor: .center)
-        } else if acc == "♮" {
-          let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-          context.draw(naturalText, at: accPoint, anchor: .center)
-        }
-        context.draw(noteText, at: notePoint, anchor: .center)
-        
       }
-      .frame(height: 320) //was 420
-      .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
+      .padding(.horizontal)
 
-      // Labels for clef, note name and MIDI code
-      HStack(spacing: 12) {
-        Text("Clef:")
-        Text(vm.currentClef == .treble ? "Treble" : "Bass")
-        Text("Note:")
-        Text(vm.currentNote.name).monospaced() //ToDo look for this note with midiKit
-        Text("MIDI:")
-        Text(String(vm.currentNote.midi)).monospaced()
-      }
-      
-      
-      // Received values from MIDI to compare with the random note above
-      HStack(spacing: 12) {
-        Text("Received Clef:")
-        Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
-        Text("Received Note:")
-        Text(noteName(from: conductor.data.noteOn))
-          .monospaced()
-        Text("Received MIDI:")
-        Text(String(conductor.data.noteOn))
-          .monospaced()
-
-        //Text("Waiting for new note…")
-          //.foregroundStyle(.secondary)
-      }
-
-      // Feedback banner for correctness (always visible)
-      Text(feedbackMessage)
-        .font(.title3.weight(.semibold))
-        .foregroundStyle(feedbackColor)
-        .padding(.top, 4)
-              
       // Practice mode controls or free play button
       if isPracticeMode {
         HStack(spacing: 12) {
@@ -754,7 +749,7 @@ struct ContentView: View {
       conductor.stop()
     }
     .padding()
-  }
+  }//contentview
   var midiReceivedIndicator: some View {
       HStack(alignment: .center) {
           // Left-aligned MIDI In indicator
@@ -869,4 +864,3 @@ struct ContentView: View {
         .environmentObject(MIDIMonitorConductor())
         .frame(width: 900, height: 900)
 }
-
