@@ -94,55 +94,57 @@ struct KeyBoardView: View {
       VStack {
         
         // Full-width control panel above the keyboard (knobs, meter, and 3D toggle on one line)
-        HStack(alignment: .center, spacing: 24) {
-          KnobImage()
-          KnobImage()
-          Spacer()
+        ZStack {
+          HStack(alignment: .center, spacing: 24) {
+            KnobImage()
+            KnobImage()
+            Spacer()
+            
+            // 3D Toggle Button - Enhanced visibility
+            Button(action: {
+              withAnimation(.easeInOut(duration: 0.3)) {
+                is3DMode.toggle()
+              }
+            }) {
+              HStack(spacing: 8) {
+                Image(systemName: is3DMode ? "cube.fill" : "rectangle.fill")
+                  .font(.system(size: 18, weight: .semibold))
+                Text(is3DMode ? "3D" : "2D")
+                  .font(.system(size: 16, weight: .semibold))
+              }
+              .foregroundColor(.white)
+              .padding(.horizontal, 16)
+              .padding(.vertical, 10)
+              .background(
+                RoundedRectangle(cornerRadius: 10)
+                  .fill(is3DMode ? 
+                        LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing) :
+                        LinearGradient(colors: [.gray, .secondary], startPoint: .leading, endPoint: .trailing)
+                  )
+                  .shadow(color: is3DMode ? .blue.opacity(0.4) : .gray.opacity(0.3), radius: 4)
+              )
+            }
+            .buttonStyle(.plain)
+            
+            ZStack(alignment: .topTrailing) {
+              KnobImage()
+              Image("redled2")
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .frame(width: 36, height: 36)
+                .offset(x: 22, y: -17)
+                .accessibilityHidden(true)
+            }
+          }
+        }
+        .overlay(alignment: .center) {
           NodeOutputView(conductor.instrument, color: .red)
             .frame(height: 52)
-            .frame(maxWidth: 300)
+            .frame(width: 260)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(GlassReflection(cornerRadius: 8))
             .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-          Spacer()
-          
-          // 3D Toggle Button - Enhanced visibility
-          Button(action: {
-            withAnimation(.easeInOut(duration: 0.3)) {
-              is3DMode.toggle()
-            }
-          }) {
-            HStack(spacing: 8) {
-              Image(systemName: is3DMode ? "cube.fill" : "rectangle.fill")
-                .font(.system(size: 18, weight: .semibold))
-              Text(is3DMode ? "3D" : "2D")
-                .font(.system(size: 16, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-              RoundedRectangle(cornerRadius: 10)
-                .fill(is3DMode ? 
-                      LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing) :
-                      LinearGradient(colors: [.gray, .secondary], startPoint: .leading, endPoint: .trailing)
-                )
-                .shadow(color: is3DMode ? .blue.opacity(0.4) : .gray.opacity(0.3), radius: 4)
-            )
-          }
-          .buttonStyle(.plain)
-          
-          ZStack(alignment: .topTrailing) {
-            KnobImage()
-            Image("redled2")
-              .resizable()
-              .interpolation(.high)
-              .antialiased(true)
-              .frame(width: 36, height: 36)
-              .offset(x: 32, y: -16)
-              .accessibilityHidden(true)
-          }
-          
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 20)
@@ -163,9 +165,9 @@ struct KeyBoardView: View {
         GeometryReader { proxy in
           let whiteCount = max(1, (lowNote...highNote).filter { ![1,3,6,8,10].contains($0 % 12) }.count)
           let keyWidth = proxy.size.width / CGFloat(whiteCount)
-          let lengthFactor: CGFloat = is3DMode ? 4.6 : 3.4
+          let lengthFactor: CGFloat = is3DMode ? 5.6 : 3.4
           let idealHeight = keyWidth * lengthFactor
-          let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...300) : idealHeight.clamped(to: 170...320)
+          let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...350) : idealHeight.clamped(to: 170...320)
           
           if is3DMode {
             Keyboard3DView(
@@ -229,18 +231,18 @@ struct KeyBoardView: View {
             .background(
               ZStack {
                 // Unified chassis color to match the top panel
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                   .fill(Color("MeterPanelColor"))
 
                 // Subtle vertical sheen similar to Panel3DBackground
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                   .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
                   .blendMode(.softLight)
 
                 // Inner bottom lip for depth
                 VStack {
                   Spacer()
-                  RoundedRectangle(cornerRadius: 6, style: .continuous)
+                  RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
                     .frame(height: 8)
                     .padding(.horizontal, 8)
@@ -251,9 +253,19 @@ struct KeyBoardView: View {
             )
             .overlay(
               // Edge highlight
-              RoundedRectangle(cornerRadius: 10, style: .continuous)
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
                 .blendMode(.overlay)
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(
+                  LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing),
+                  lineWidth: 1
+                )
+                .blendMode(.screen)
+                .opacity(0.9)
             )
             .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
             .frame(height: responsiveHeight + 18)
@@ -263,7 +275,7 @@ struct KeyBoardView: View {
         .padding(.bottom, docked ? 0 : (is3DMode ? 40 : 28))
       }
       .background(
-          docked ? Color.clear : (colorScheme == .dark ? Color.clear : Color("MeterPanelColor"))
+        docked ? Color.clear : (colorScheme == .dark ? Color.clear : Color("MeterPanelColor"))
       )
       .overlay(alignment: .top) {
           if docked {
@@ -473,8 +485,62 @@ struct PianoRail: View {
           .blendMode(.plusLighter)
       }
       .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+      .background(
+        ChromeStanchions(upLength: 16, downLength: 20, barWidth: 8, spacing: 54)
+          .padding(.vertical, -8) // let bars extend above and below the rail
+      )
     }
   }
+
+struct ChromeStanchions: View {
+    var upLength: CGFloat = 14
+    var downLength: CGFloat = 18
+    var barWidth: CGFloat = 6
+    var spacing: CGFloat = 44 // distance between the two center bars
+    var edgeInset: CGFloat = 28 // inset from left/right edges for outer bars
+
+    private func barPath(fill colors: [Color]) -> some View {
+        RoundedRectangle(cornerRadius: barWidth/2, style: .continuous)
+            .fill(LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom))
+            .frame(width: barWidth, height: upLength + downLength)
+            .overlay(
+                RoundedRectangle(cornerRadius: barWidth/2, style: .continuous)
+                    .stroke(LinearGradient(colors: [Color.white.opacity(0.9), Color.white.opacity(0.25)], startPoint: .top, endPoint: .bottom), lineWidth: 0.6)
+            )
+            .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 1)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let centerX = geo.size.width / 2
+            let leftCenterX = centerX - spacing/2
+            let rightCenterX = centerX + spacing/2
+            let outerLeftX = max(edgeInset, barWidth/2 + 2)
+            let outerRightX = geo.size.width - max(edgeInset, barWidth/2 + 2)
+
+            let chromeColors = [Color.white.opacity(0.85), Color(white: 0.7), Color(white: 0.45), Color(white: 0.85)]
+
+            ZStack {
+                // Outer left bar
+                barPath(fill: chromeColors)
+                    .position(x: outerLeftX, y: geo.size.height/2)
+
+                // Inner left (centered pair)
+                barPath(fill: chromeColors)
+                    .position(x: leftCenterX, y: geo.size.height/2)
+
+                // Inner right (centered pair)
+                barPath(fill: chromeColors)
+                    .position(x: rightCenterX, y: geo.size.height/2)
+
+                // Outer right bar
+                barPath(fill: chromeColors)
+                    .position(x: outerRightX, y: geo.size.height/2)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
 
   struct KeybedBackground: View {
     var body: some View {
@@ -842,10 +908,8 @@ struct Keyboard3DView: View {
         let baseWhiteFront = Color(white: 0.86)
         let baseWhiteSide = Color(white: 0.80)
 
-        let tintTop: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.35) : Color.red.opacity(0.35)) : nil
-        let tintFront: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.25) : Color.red.opacity(0.25)) : nil
-        let tintSide: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.20) : Color.red.opacity(0.20)) : nil
-
+        // Removed tintTop, tintFront, tintSide declarations
+        
         // Shadows
         var shadow = Path()
         shadow.move(to: CGPoint(x: x + shadowOffset, y: keyEndY + keyHeight + shadowOffset))
@@ -867,8 +931,12 @@ struct Keyboard3DView: View {
             startPoint: CGPoint(x: x, y: keyEndY),
             endPoint: CGPoint(x: x, y: keyStartY)
         )
-        context.fill(keyTop, with: topFill)
-        if let tintTop { context.fill(keyTop, with: .color(tintTop)) }
+        if isPressed {
+            let pressedColor: Color = effectiveCorrect ? .green : .red
+            context.fill(keyTop, with: .color(pressedColor))
+        } else {
+            context.fill(keyTop, with: topFill)
+        }
 
         // Front face
         var keyFront = Path()
@@ -883,7 +951,7 @@ struct Keyboard3DView: View {
             endPoint: CGPoint(x: x, y: keyEndY + keyHeight)
         )
         context.fill(keyFront, with: frontFill)
-        if let tintFront { context.fill(keyFront, with: .color(tintFront)) }
+        // Removed tintFront fill line here
 
         // Right side
         var keyRight = Path()
@@ -898,7 +966,7 @@ struct Keyboard3DView: View {
             endPoint: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight)
         )
         context.fill(keyRight, with: sideFill)
-        if let tintSide { context.fill(keyRight, with: .color(tintSide)) }
+        // Removed tintSide fill line here
 
         // Subtle highlight on top
         var highlight = Path()
@@ -908,7 +976,9 @@ struct Keyboard3DView: View {
         highlight.addLine(to: CGPoint(x: x + backXOffset + backWidth - inset/3, y: keyStartY - 2))
         highlight.addLine(to: CGPoint(x: x + backXOffset + inset/3, y: keyStartY - 2))
         highlight.closeSubpath()
-        context.fill(highlight, with: .color(Color.white.opacity(0.25)))
+        if !isPressed {
+            context.fill(highlight, with: .color(Color.white.opacity(0.25)))
+        }
 
         // Outlines
         context.stroke(keyTop, with: .color(Color.black.opacity(0.12)), lineWidth: 0.5)
@@ -964,9 +1034,7 @@ struct Keyboard3DView: View {
         let sideBase = Color(white: 0.06)
         let frontBase = Color(white: 0.04)
 
-        let tintTop: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.35) : Color.red.opacity(0.35)) : nil
-        let tintSide: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.22) : Color.red.opacity(0.22)) : nil
-        let tintFront: Color? = isPressed ? (effectiveCorrect ? Color.green.opacity(0.18) : Color.red.opacity(0.18)) : nil
+        // Removed tintTop, tintSide, tintFront declarations
 
         // Shadow
         var shadow = Path()
@@ -989,8 +1057,12 @@ struct Keyboard3DView: View {
             startPoint: CGPoint(x: x, y: keyEndY),
             endPoint: CGPoint(x: x, y: keyStartY)
         )
-        context.fill(keyTop, with: topFill)
-        if let tintTop { context.fill(keyTop, with: .color(tintTop)) }
+        if isPressed {
+            let pressedColor: Color = effectiveCorrect ? .green : .red
+            context.fill(keyTop, with: .color(pressedColor))
+        } else {
+            context.fill(keyTop, with: topFill)
+        }
 
         // Front
         var keyFront = Path()
@@ -1005,7 +1077,7 @@ struct Keyboard3DView: View {
             endPoint: CGPoint(x: x, y: keyEndY + keyHeight)
         )
         context.fill(keyFront, with: frontFill)
-        if let tintFront { context.fill(keyFront, with: .color(tintFront)) }
+        // Removed tintFront fill line here
 
         // Right side
         var keyRight = Path()
@@ -1020,7 +1092,7 @@ struct Keyboard3DView: View {
             endPoint: CGPoint(x: x + backXOffset + backWidth, y: keyStartY + keyHeight)
         )
         context.fill(keyRight, with: sideFill)
-        if let tintSide { context.fill(keyRight, with: .color(tintSide)) }
+        // Removed tintSide fill line here
 
         // Left side
         var keyLeft = Path()
