@@ -47,7 +47,7 @@ struct KeyBoardView: View {
   @State private var externalVelocities: [Int: Double] = [:] // midiNote -> 0.0...1.0
   
   @State private var pressedCorrectness: [Int: Bool] = [:] // midi -> was-correct at noteOn
-  @State private var is3DMode: Bool = false
+  @AppStorage("keyboardIs3DMode") private var is3DMode: Bool = false
   
   @State var scaleIndex = Scale.allCases.firstIndex(of: .chromatic) ?? 0 {
     didSet {
@@ -155,7 +155,7 @@ struct KeyBoardView: View {
         .padding(.horizontal)
         
         // Piano rail separator tying panel and keyboard together
-        PianoRail()
+        PianoRail(is3D: is3DMode)
           .frame(height: 14)
           .padding(.horizontal, 22)
           .padding(.top, -4)
@@ -168,18 +168,74 @@ struct KeyBoardView: View {
           let lengthFactor: CGFloat = is3DMode ? 5.6 : 3.4
           let idealHeight = keyWidth * lengthFactor
           let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...350) : idealHeight.clamped(to: 170...320)
+          let chassisCorner3D: CGFloat = {
+              // Map height 170...320 -> radius 32...18 (clamped)
+              let minH: CGFloat = 170
+              let maxH: CGFloat = 320
+              let minR: CGFloat = 32
+              let maxR: CGFloat = 18
+              let t = ((responsiveHeight - minH) / (maxH - minH)).clamped(to: 0...1)
+              return (minR + (maxR - minR) * t).clamped(to: 18...32)
+          }()
           
           if is3DMode {
-            Keyboard3DView(
-              lowNote: lowNote,
-              highNote: highNote,
-              conductor: conductor,
-              isCorrect: isCorrect,
-              pressedCorrectness: $pressedCorrectness,
-              externalVelocities: $externalVelocities,
-              scientificLabel: scientificLabel
+            ZStack {
+              Keyboard3DView(
+                lowNote: lowNote,
+                highNote: highNote,
+                conductor: conductor,
+                isCorrect: isCorrect,
+                pressedCorrectness: $pressedCorrectness,
+                externalVelocities: $externalVelocities,
+                scientificLabel: scientificLabel
+              )
+              // Clip the 3D content so the border is visible and clean
+              .clipShape(RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous))
+              .frame(height: responsiveHeight)
+            }
+            .padding(.horizontal, 8) // thinner left/right bezel to match 2D
+            .padding(.bottom, 10)
+            .background(
+              ZStack {
+                // Unified chassis color to match the top panel (same as 2D)
+                RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                  .fill(Color("MeterPanelColor"))
+
+                // Subtle vertical sheen similar to Panel3DBackground (same as 2D)
+                RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                  .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
+                  .blendMode(.softLight)
+
+                // Inner bottom lip for depth (same as 2D)
+                VStack {
+                  Spacer()
+                  RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0.10)], startPoint: .top, endPoint: .bottom))
+                    .frame(height: 8)
+                    .padding(.horizontal, 8)
+                    .opacity(0.9)
+                }
+                .padding(.vertical, 6)
+              }
             )
-            .frame(height: responsiveHeight)
+            .overlay(
+              // Edge highlight (same as 2D)
+              RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                .blendMode(.overlay)
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: chassisCorner3D, style: .continuous)
+                .stroke(
+                  LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing),
+                  lineWidth: 1
+                )
+                .blendMode(.screen)
+                .opacity(0.9)
+            )
+            .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
+            .frame(height: responsiveHeight + 18)
           } else {
             ZStack {
               // Dark keybed background constrained to keyboard height
@@ -468,6 +524,7 @@ struct GlassReflection: View {
 }
 
 struct PianoRail: View {
+    var is3D: Bool = false
     var body: some View {
       ZStack {
         // Base glossy black rail
@@ -486,8 +543,8 @@ struct PianoRail: View {
       }
       .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
       .background(
-        ChromeStanchions(upLength: 16, downLength: 20, barWidth: 8, spacing: 54)
-          .padding(.vertical, -8) // let bars extend above and below the rail
+        ChromeStanchions(upLength: 16, downLength: is3D ? 26 : 20, barWidth: 8, spacing: 54)
+          .padding(.vertical, is3D ? -12 : -8) // let bars extend above and below the rail
       )
     }
   }
@@ -586,8 +643,9 @@ struct Keyboard3DView: View {
     @State private var lastMidi: Int? = nil
 
     // Shared layout constants so drawing and hit-testing always match
+// CHANGED here:
     private let backScale: CGFloat = 0.80              // Back edge is 80% of front width (changed from 0.85)
-    private let caseHeight: CGFloat = 36
+    private let caseHeight: CGFloat = 26               // changed from 36
     private let whiteFrontHeight: CGFloat = 24          // changed from 22
     private let blackFrontHeight: CGFloat = 18          // changed from 16
     private let blackKeyElevation: CGFloat = -18        // changed from -14
@@ -718,10 +776,11 @@ struct Keyboard3DView: View {
         drawPerspectiveKeyboardCase(context: context, size: size, keyboardY: keyboardDepth * 0.20 / 0.72, depth: keyboardDepth, caseHeight: caseH)
 
         // Under-panel shadow to increase overhang
+// CHANGED here:
         var underShadow = Path()
         underShadow.move(to: CGPoint(x: 0, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
         underShadow.addLine(to: CGPoint(x: totalWidth, y: keyboardDepth * 0.20 / 0.72 + keyboardDepth + caseH * 0.02))
-        context.stroke(underShadow, with: .color(Color.black.opacity(0.45)), lineWidth: max(2, caseH * 0.15))
+        context.stroke(underShadow, with: .color(Color.black.opacity(0.45)), lineWidth: max(1.5, caseH * 0.10))
 
         // Fill white key area to avoid gaps (uses the backScale constant)
         let backWidth = totalWidth * backScale
@@ -773,14 +832,15 @@ struct Keyboard3DView: View {
         // Draw black keys on top with perspective
         for midi in blackKeys {
             if let whiteIndex = getBlackKeyPosition(midi: midi, whiteKeys: whiteKeys) {
-                let baseX = CGFloat(whiteIndex) * keySpacing
-                let offsetX = getBlackKeyOffset(midi: midi)
-                let x = baseX + offsetX * keySpacing - keySpacing * 0.3
+                let baseX = CGFloat(whiteIndex) * keySpacing // left white key of the pair
+                let blackWidth = keySpacing * 0.56
+                let centerX = baseX + keySpacing              // center at the seam between the two white keys
+                let x = centerX - blackWidth / 2             // left edge of the black key
                 drawPerspective3DBlackKey(
                     context: context,
                     midi: midi,
                     x: x,
-                    width: keySpacing * 0.56,
+                    width: blackWidth,
                     keyboardY: keyboardDepth * 0.20 / 0.72,
                     keyboardDepth: keyboardDepth,
                     viewDistance: 200,
@@ -1173,6 +1233,7 @@ struct Keyboard3DView: View {
     private func midiFromLocation(_ location: CGPoint, in size: CGSize) -> Int {
         let whiteKeys = (lowNote...highNote).filter { !isBlackKey($0) }
         let keySpacing = size.width / CGFloat(max(1, whiteKeys.count))
+        let blackWidth = keySpacing * 0.56
         
         let clampedX = min(max(location.x, 0), size.width - 0.0001)
         
@@ -1208,30 +1269,52 @@ struct Keyboard3DView: View {
             let keyIndex = Int(clampedX / keySpacing)
             if keyIndex >= 0 && keyIndex < whiteKeys.count {
                 let whiteKeyMidi = whiteKeys[keyIndex]
-                let blackWidth = keySpacing * 0.56 * 0.95 // widened hit-box for more forgiving touches
 
-                // Check right-side black key above this white key
+// REPLACED BLOCK START
+//                // Check right-side black key above this white key
+//                let rightBlack = whiteKeyMidi + 1
+//                if isBlackKey(rightBlack) && rightBlack <= highNote {
+//                    let baseX = CGFloat(keyIndex) * keySpacing
+//                    let offsetX = getBlackKeyOffset(midi: rightBlack)
+//                    let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
+//                    let bxRight = bx + blackWidth * 1.14
+//                    if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return rightBlack }
+//                }
+                // Check right-side black key above this white key (centered over the gap)
                 let rightBlack = whiteKeyMidi + 1
                 if isBlackKey(rightBlack) && rightBlack <= highNote {
-                    let baseX = CGFloat(keyIndex) * keySpacing
-                    let offsetX = getBlackKeyOffset(midi: rightBlack)
-                    let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
-                    let bxRight = bx + blackWidth * 1.14
-                    if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return rightBlack }
+                    let baseX = CGFloat(keyIndex) * keySpacing // left white key of the pair
+                    let centerX = baseX + keySpacing              // center at the seam between the two white keys
+                    let halfWidth = blackWidth / 2
+                    if clampedX >= centerX - halfWidth && clampedX <= centerX + halfWidth { return rightBlack }
                 }
+// REPLACED BLOCK END
 
-                // Check left-side black key above the previous white key
+// REPLACED BLOCK START
+//                // Check left-side black key above the previous white key
+//                if keyIndex > 0 {
+//                    let leftWhite = whiteKeys[keyIndex - 1]
+//                    let leftBlack = leftWhite + 1
+//                    if isBlackKey(leftBlack) && leftBlack <= highNote {
+//                        let baseX = CGFloat(keyIndex - 1) * keySpacing
+//                        let offsetX = getBlackKeyOffset(midi: leftBlack)
+//                        let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
+//                        let bxRight = bx + blackWidth * 1.14
+//                        if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return leftBlack }
+//                    }
+//                }
+                // Check left-side black key above the previous white key (centered over the gap)
                 if keyIndex > 0 {
                     let leftWhite = whiteKeys[keyIndex - 1]
                     let leftBlack = leftWhite + 1
                     if isBlackKey(leftBlack) && leftBlack <= highNote {
-                        let baseX = CGFloat(keyIndex - 1) * keySpacing
-                        let offsetX = getBlackKeyOffset(midi: leftBlack)
-                        let bx = baseX + offsetX * keySpacing - keySpacing * 0.3
-                        let bxRight = bx + blackWidth * 1.14
-                        if clampedX >= bx - blackWidth * 0.14 && clampedX <= bxRight { return leftBlack }
+                        let baseX = CGFloat(keyIndex - 1) * keySpacing // left white key of the pair
+                        let centerX = baseX + keySpacing              // center at the seam between the two white keys
+                        let halfWidth = blackWidth / 2
+                        if clampedX >= centerX - halfWidth && clampedX <= centerX + halfWidth { return leftBlack }
                     }
                 }
+// REPLACED BLOCK END
             }
         }
         
