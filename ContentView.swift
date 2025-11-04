@@ -538,29 +538,47 @@ struct ContentView: View {
 
   var body: some View {
     ZStack {
-      // Subtle, adaptive background (much lighter in Light Mode, gentle in Dark Mode)
+      // Subtle, adaptive background (unified gradient for both light and dark modes)
       Group {
-        if colorScheme == .dark {
-          LinearGradient(
-            colors: [
-              Color.red.opacity(0.35), // top (dark mode to match light mode tint)
-              Color(white: 0.12)       // bottom
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        } else {
-          LinearGradient(
-            colors: [
-              Color.blue.opacity(0.35),
-              Color(white: 0.94)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-        }
+        LinearGradient(
+          colors: [
+            Color(red: 0.36, green: 0.10, blue: 0.11), // unified top (opaque dark red)
+            Color(red: 0.28, green: 0.07, blue: 0.08)  // unified bottom (opaque dark red)
+          ],
+          startPoint: .top,
+          endPoint: .bottom
+        )
       }
       .ignoresSafeArea()
+      // Subtle bottom lift to brighten behind the keyboard with a feathered blend (applies to both modes)
+      .overlay(
+        LinearGradient(
+          colors: [
+            Color.red.opacity(0.00),
+            Color.red.opacity(0.02),
+            Color.red.opacity(0.05),
+            Color.red.opacity(0.08)
+          ],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+        .ignoresSafeArea()
+        .mask(
+          LinearGradient(
+            stops: [
+              .init(color: .clear, location: 0.0),
+              .init(color: .black.opacity(0.0), location: 0.35),
+              .init(color: .black.opacity(0.6), location: 0.55),
+              .init(color: .black, location: 1.0)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+          .mask(
+            VStack { Spacer(); Rectangle().frame(height: 260) }
+          )
+        )
+      )
 
       // Existing content
       VStack(spacing: 16) {
@@ -627,7 +645,7 @@ struct ContentView: View {
             let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
             let isDark = colorScheme == .dark
             let ledgerStroke: CGFloat = isDark ? 1.6 : 1.4
-            let ledgerColor: Color = isDark ? .white.opacity(0.85) : .black.opacity(0.6)
+            let ledgerColor: Color = .white.opacity(0.85)
             let ledgerLength: CGFloat = lineWidth * 0.85
             for y in ledgerYs {
               var p = Path()
@@ -654,6 +672,7 @@ struct ContentView: View {
           }
           .frame(height: 320)
           .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
+          .foregroundStyle(.white)
 
           // Labels for clef, note name and MIDI code
           HStack(spacing: 12) {
@@ -678,17 +697,51 @@ struct ContentView: View {
           }
         }
         .padding(.horizontal)
+        .foregroundStyle(.white)
 
         // Practice mode controls or free play button
         if isPracticeMode {
           HStack(spacing: 12) {
-            Button("Exit Practice") {
-              exitPracticeMode()
-            }
-            .buttonStyle(.bordered)
+            Text("Practice")
             
-            Text("Note \(currentPracticeIndex + 1) of \(practiceCount)")
-              .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text("Count:")
+                Text("\(practiceCount)")
+                    .monospaced()
+
+                HStack(spacing: 6) {
+                    Button {
+                        practiceCount = max(5, practiceCount - 5)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        practiceCount = min(100, practiceCount + 5)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color.white.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .foregroundStyle(.white)
+            
+            Button("Start Practice") {
+              startPractice()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.white.opacity(0.88))
           }
           .frame(height: 56)
         } else {
@@ -700,23 +753,53 @@ struct ContentView: View {
               }
             }
             .buttonStyle(.borderedProminent)
+            .tint(.white.opacity(0.88))
 
             // Practice mode controls
             HStack(spacing: 12) {
               Text("Practice")
-              Picker("Practice Count", selection: $practiceCount) {
-                ForEach(Array(stride(from: 5, through: 100, by: 5)), id: \.self) { n in
-                  Text("\(n)").tag(n)
-                }
+              HStack(spacing: 8) {
+                  Text("Count:")
+                  Text("\(practiceCount)")
+                      .monospaced()
+
+                  HStack(spacing: 6) {
+                      Button {
+                          practiceCount = max(5, practiceCount - 5)
+                      } label: {
+                          Image(systemName: "chevron.down")
+                              .font(.system(size: 12, weight: .semibold))
+                              .foregroundStyle(.white)
+                              .padding(6)
+                              .background(Color.white.opacity(0.12))
+                              .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                      }
+                      .buttonStyle(.plain)
+
+                      Button {
+                          practiceCount = min(100, practiceCount + 5)
+                      } label: {
+                          Image(systemName: "chevron.up")
+                              .font(.system(size: 12, weight: .semibold))
+                              .foregroundStyle(.white)
+                              .padding(6)
+                              .background(Color.white.opacity(0.12))
+                              .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                      }
+                      .buttonStyle(.plain)
+                  }
               }
-              .pickerStyle(.menu)
+              .foregroundStyle(.white)
               
               Button("Start Practice") {
                 startPractice()
               }
-              .buttonStyle(.bordered)
+              .buttonStyle(.borderedProminent)
+              .tint(.white.opacity(0.88))
             }
           }
+          .foregroundStyle(.white)
+          .tint(.white.opacity(0.9))
           .frame(height: 56)
         }
 
@@ -800,26 +883,54 @@ struct ContentView: View {
 
           Spacer()
 
-          // Centered Note style picker (no overlay, so nothing can overlap it)
+          // Centered Note style picker (replaced with custom segmented control)
           HStack(spacing: 8) {
               Text("Note Type:")
                 .font(.callout)
                 .fontWeight(.semibold)
-              Picker("Note", selection: $appData.noteHeadStyle) {
-                  Text("Whole").tag(NoteHeadStyle.whole)
-                  Text("Half").tag(NoteHeadStyle.half)
-                  Text("Quarter").tag(NoteHeadStyle.quarter)
+              // Removed old ZStack with Picker and replaced per instructions:
+              HStack(spacing: 0) {
+                  ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
+                      let isSelected = appData.noteHeadStyle == style
+                      Button(action: { appData.noteHeadStyle = style }) {
+                          Text({
+                              switch style {
+                              case .whole: return "Whole"
+                              case .half: return "Half"
+                              case .quarter: return "Quarter"
+                              }
+                          }())
+                          .font(.callout)
+                          .fontWeight(.semibold)
+                          .frame(width: 200/3, height: 28)
+                          .contentShape(Rectangle())
+                          .foregroundColor(isSelected ? .black : .white)
+                          .background(
+                              Group {
+                                  if isSelected {
+                                      RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                          .fill(Color.white)
+                                          .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)
+                                  } else {
+                                      Color.clear
+                                  }
+                              }
+                          )
+                      }
+                      .buttonStyle(.plain)
+                  }
               }
-              .labelsHidden()
-              .pickerStyle(.segmented)
-              .frame(width: 200)
-              Divider().frame(height: 20)
+              .padding(3)
+              .background(Color.white.opacity(0.10))
+              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 #if os(macOS)
               Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
                   .controlSize(.small)
+                  .background(Color.clear)
 #else
               Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
                   .controlSize(.small)
+                  .background(Color.clear)
 #endif
           }
 
@@ -829,17 +940,19 @@ struct ContentView: View {
           HStack(spacing: 12) {
               Text(calibrationDisplayText)
               .font(.subheadline)
-                  .foregroundColor(colorScheme == .dark ? Color.primary : Color.black.opacity(0.85))
+                  .foregroundColor(.white)
                   //.lineLimit(1)
                   .frame(width: 130)
 
               Button("History") { 
                   showingPracticeHistory = true 
               }
-              .buttonStyle(.bordered)
+              .buttonStyle(.borderedProminent)
+              .tint(.white.opacity(0.88))
 
               Button("Calibrate") { showingCalibration = true }
-                  .buttonStyle(.bordered)
+                  .buttonStyle(.borderedProminent)
+                  .tint(.white.opacity(0.88))
           }
       }
       .padding([.top, .horizontal], 20)
@@ -860,6 +973,8 @@ struct ContentView: View {
       .sheet(isPresented: $showingPracticeHistory) {
           PracticeHistoryView()
       }
+      .foregroundStyle(.white)
+      .tint(.white.opacity(0.9))
   }
 
   // Staff drawing control (positions match your previous staff anchors)
@@ -868,6 +983,18 @@ struct ContentView: View {
   private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
 
 }
+
+private extension View {
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+}
+
 #Preview("Whole") {
     let data = AppData()
     data.noteHeadStyle = .whole
