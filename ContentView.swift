@@ -543,8 +543,8 @@ struct ContentView: View {
         if colorScheme == .dark {
           LinearGradient(
             colors: [
-              Color(white: 0.14), // top (dark mode, lighter than before)
-              Color(white: 0.12)  // bottom
+              Color.red.opacity(0.35), // top (dark mode to match light mode tint)
+              Color(white: 0.12)       // bottom
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -552,7 +552,7 @@ struct ContentView: View {
         } else {
           LinearGradient(
             colors: [
-              Color("MeterPanelColor").opacity(0.35),
+              Color.blue.opacity(0.35),
               Color(white: 0.94)
             ],
             startPoint: .top,
