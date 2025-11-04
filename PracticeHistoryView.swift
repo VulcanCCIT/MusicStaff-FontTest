@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct PracticeHistoryView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
     
     @State private var practiceDataService: PracticeDataService?
@@ -14,7 +14,7 @@ struct PracticeHistoryView: View {
     @State private var showingStatistics = false
     
     var body: some View {
-        NavigationView {
+        NavigationSplitView {
             VStack(spacing: 0) {
                 if isLoading {
                     ProgressView("Loading practice history...")
@@ -41,7 +41,34 @@ struct PracticeHistoryView: View {
             .onChange(of: isLoading) { oldValue, newValue in
                 print("🔍 Loading changed from \(oldValue) to \(newValue)")
             }
-            
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        navigationPath.removeLast()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink("Statistics") {
+                        PracticeStatisticsView()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        navigationPath.removeLast()
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Statistics") {
+                        showingStatistics = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+                #endif
+            }
+        } detail: {
             // Default detail view for when no session is selected
             VStack {
                 Image(systemName: "music.note.list")
@@ -57,38 +84,6 @@ struct PracticeHistoryView: View {
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(minWidth: 900, minHeight: 500)
-        .navigationTitle("Practice History")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
-        #endif
-        .toolbar {
-            #if os(iOS)
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Close") {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink("Statistics") {
-                    PracticeStatisticsView()
-                }
-                .buttonStyle(.bordered)
-            }
-            #else
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close") {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Statistics") {
-                    showingStatistics = true
-                }
-                .buttonStyle(.bordered)
-            }
-            #endif
         }
         .alert("Delete Session", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -518,6 +513,8 @@ struct PracticeSessionDetailView: View {
 }
 
 #Preview {
-    PracticeHistoryView()
-        .modelContainer(for: PracticeSession.self, inMemory: true)
+    NavigationStack {
+        PracticeHistoryView(navigationPath: .constant(NavigationPath()))
+            .modelContainer(for: PracticeSession.self, inMemory: true)
+    }
 }

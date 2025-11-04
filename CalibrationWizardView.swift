@@ -147,7 +147,7 @@ private func midiNoteName(_ midi: Int) -> String {
 struct CalibrationWizardView: View {
     @EnvironmentObject private var appData: AppData
     @EnvironmentObject private var conductor: MIDIMonitorConductor
-    @Binding var isPresented: Bool
+    @Binding var navigationPath: NavigationPath
 
     private enum Step { case pressLowest, pressHighest, review }
     @State private var step: Step = .pressLowest
@@ -175,14 +175,6 @@ struct CalibrationWizardView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            // Header with Cancel
-            HStack {
-                Text("Keyboard Calibration")
-                    .font(.title2).bold()
-                Spacer()
-                Button("Cancel") { isPresented = false }
-            }
-
             // Mode picker
             Picker("Calibration Mode", selection: $mode) {
                 Text("MIDI Keyboard").tag(Mode.midi)
@@ -282,13 +274,24 @@ struct CalibrationWizardView: View {
                     Button("Save") {
                         appData.minMIDINote = manualComputedRange.lowerBound
                         appData.maxMIDINote = manualComputedRange.upperBound
-                        isPresented = false
+                        navigationPath.removeLast()
                     }
                     .buttonStyle(.borderedProminent)
                 }
             }
         }
         .padding()
+        .navigationTitle("Keyboard Calibration")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    navigationPath.removeLast()
+                }
+            }
+        }
         .onChange(of: conductor.data.noteOn) { _, newValue in
             // Only capture MIDI input when in MIDI mode
             guard mode == .midi else { return }
@@ -334,7 +337,7 @@ struct CalibrationWizardView: View {
         let hi = max(a, b)
         appData.minMIDINote = lo
         appData.maxMIDINote = hi
-        isPresented = false
+        navigationPath.removeLast()
     }
 
     @ViewBuilder
@@ -365,7 +368,9 @@ struct CalibrationWizardView: View {
 #Preview {
     let data = AppData()
     let conductor = MIDIMonitorConductor()
-    return CalibrationWizardView(isPresented: .constant(true))
-        .environmentObject(data)
-        .environmentObject(conductor)
+    return NavigationStack {
+        CalibrationWizardView(navigationPath: .constant(NavigationPath()))
+            .environmentObject(data)
+            .environmentObject(conductor)
+    }
 }

@@ -335,33 +335,37 @@ private func noteName(from midiNote: Int) -> String {
     return "\(name)\(octave)"
 }
 
+enum NavigationDestination: Hashable {
+    case calibration
+    case history
+}
+
 struct ContentView: View {
   @EnvironmentObject private var appData: AppData
   @Environment(\.colorScheme) private var colorScheme
-
+  
   let trebleStaff = MusicSymbol.trebleStaff.text()
   let bassStaff = MusicSymbol.bassStaff.text()
   
   let sharpText = MusicSymbol.sharpSymbol.text()
   let flatText = MusicSymbol.flatSymbol.text()
   let naturalText = MusicSymbol.naturalSymbol.text()
-
+  
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
-
+  
   @StateObject private var vm = StaffViewModel()
   @EnvironmentObject private var conductor: MIDIMonitorConductor
   // Removed: @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
-
+  
   @State private var feedbackMessage: String = "Waiting for note…"
   @State private var feedbackColor: Color = .secondary
   @State private var isCorrect: Bool? = nil
-
-  @State private var showingCalibration = false
+  
+  @State private var navigationPath = NavigationPath()
   @State private var showDebugOverlays = false
-  @State private var showingPracticeHistory = false
-
+  
   // Practice mode state
   @State private var practiceCount: Int = 5
   @State private var showingPractice: Bool = false
@@ -372,34 +376,39 @@ struct ContentView: View {
   @State private var showingResults: Bool = false
   @State private var practiceStartDate: Date = Date()
   @State private var practiceSettings: PracticeSettings = PracticeSettings(
-      count: 5,
-      includeAccidentals: false,
-      allowedRange: nil,
-      clefMode: .random
+    count: 5,
+    includeAccidentals: false,
+    allowedRange: nil,
+    clefMode: .random
   )
-
+  
   // Removed isWaitingForNote and receivedBlankDelay
-
+  
+  // Staff drawing control (positions match your previous staff anchors)
+  private let trebleStaffPoint = CGPoint(x: 155, y: 150)
+  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
+  private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
+  
   private var currentNoteSymbol: MusicSymbol {
     // Determine stem direction relative to the middle staff line
     let step = vm.step(for: vm.currentNote.midi, clef: vm.currentClef)
     let stemUp = step > 0 // above middle line => stem up; below => stem down; middle (0) can default to down
-
+    
     switch appData.noteHeadStyle {
-    case .whole:
-      return .wholeNote
-    case .half:
-      return stemUp ? .halfNoteUP : .halfNoteDown
-    case .quarter:
-      return stemUp ? .quarterNoteUP : .quarterNoteDown
+      case .whole:
+        return .wholeNote
+      case .half:
+        return stemUp ? .halfNoteUP : .halfNoteDown
+      case .quarter:
+        return stemUp ? .quarterNoteUP : .quarterNoteDown
     }
   }
-
+  
   private func isInCalibratedRange(_ midi: Int) -> Bool {
     guard let range = appData.calibratedRange else { return true }
     return range.contains(midi)
   }
-
+  
   private func randomizeNoteRespectingCalibration(maxAttempts: Int = 12) {
     // Ensure StaffViewModel knows the allowed range
     vm.setAllowedMIDIRange(appData.calibratedRange)
@@ -410,7 +419,7 @@ struct ContentView: View {
       if isInCalibratedRange(vm.currentNote.midi) { break }
     } while attempts < maxAttempts
   }
-
+  
   // MARK: - Practice Mode Functions
   private func startPractice() {
     isPracticeMode = true
@@ -418,10 +427,10 @@ struct ContentView: View {
     
     // Create practice settings
     practiceSettings = PracticeSettings(
-        count: practiceCount,
-        includeAccidentals: appData.includeAccidentals,
-        allowedRange: appData.calibratedRange,
-        clefMode: .random // For now, using random as default
+      count: practiceCount,
+      includeAccidentals: appData.includeAccidentals,
+      allowedRange: appData.calibratedRange,
+      clefMode: .random // For now, using random as default
     )
     
     practiceAttempts.removeAll()
@@ -432,7 +441,7 @@ struct ContentView: View {
     feedbackMessage = "Practice Mode: Play note 1 of \(practiceCount)"
     feedbackColor = .blue
   }
-
+  
   private func generatePracticeTargets() {
     practiceTargets.removeAll()
     
@@ -450,7 +459,7 @@ struct ContentView: View {
       ))
     }
   }
-
+  
   private func setCurrentPracticeTarget() {
     guard currentPracticeIndex < practiceTargets.count else {
       // Practice complete!
@@ -474,7 +483,7 @@ struct ContentView: View {
     feedbackMessage = "Practice: Play note \(currentPracticeIndex + 1) of \(practiceCount)"
     feedbackColor = .blue
   }
-
+  
   private func handlePracticeInput(_ playedMidi: Int) {
     guard isPracticeMode && currentPracticeIndex < practiceTargets.count else { return }
     
@@ -508,7 +517,7 @@ struct ContentView: View {
       feedbackColor = .red
     }
   }
-
+  
   private func exitPracticeMode() {
     isPracticeMode = false
     practiceAttempts.removeAll()
@@ -520,7 +529,7 @@ struct ContentView: View {
     feedbackMessage = "Waiting for note…"
     feedbackColor = .secondary
   }
-
+  
   private var calibrationDisplayText: String {
     if let range = appData.calibratedRange {
       let lo = range.lowerBound
@@ -535,259 +544,206 @@ struct ContentView: View {
       return "Uncalibrated"
     }
   }
-
+  
   var body: some View {
-    ZStack {
-      // Subtle, adaptive background (unified gradient for both light and dark modes)
-      Group {
-        LinearGradient(
-          colors: [
-            Color(red: 0.36, green: 0.10, blue: 0.11), // unified top (opaque dark red)
-            Color(red: 0.28, green: 0.07, blue: 0.08)  // unified bottom (opaque dark red)
-          ],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-      }
-      .ignoresSafeArea()
-      // Subtle bottom lift to brighten behind the keyboard with a feathered blend (applies to both modes)
-      .overlay(
-        LinearGradient(
-          colors: [
-            Color.red.opacity(0.00),
-            Color.red.opacity(0.02),
-            Color.red.opacity(0.05),
-            Color.red.opacity(0.08)
-          ],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-        .ignoresSafeArea()
-        .mask(
+    NavigationStack(path: $navigationPath) {
+      ZStack {
+        // Subtle, adaptive background (unified gradient for both light and dark modes)
+        Group {
           LinearGradient(
-            stops: [
-              .init(color: .clear, location: 0.0),
-              .init(color: .black.opacity(0.0), location: 0.35),
-              .init(color: .black.opacity(0.6), location: 0.55),
-              .init(color: .black, location: 1.0)
+            colors: [
+              Color(red: 0.36, green: 0.10, blue: 0.11), // unified top (opaque dark red)
+              Color(red: 0.28, green: 0.07, blue: 0.08)  // unified bottom (opaque dark red)
             ],
             startPoint: .top,
             endPoint: .bottom
           )
+        }
+        .ignoresSafeArea()
+        // Subtle bottom lift to brighten behind the keyboard with a feathered blend (applies to both modes)
+        .overlay(
+          LinearGradient(
+            colors: [
+              Color.red.opacity(0.00),
+              Color.red.opacity(0.02),
+              Color.red.opacity(0.05),
+              Color.red.opacity(0.08)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+          .ignoresSafeArea()
           .mask(
-            VStack { Spacer(); Rectangle().frame(height: 260) }
+            LinearGradient(
+              stops: [
+                .init(color: .clear, location: 0.0),
+                .init(color: .black.opacity(0.0), location: 0.35),
+                .init(color: .black.opacity(0.6), location: 0.55),
+                .init(color: .black, location: 1.0)
+              ],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+            .mask(
+              VStack { Spacer(); Rectangle().frame(height: 260) }
+            )
           )
         )
-      )
-
-      // Existing content
-      VStack(spacing: 16) {
-        midiReceivedIndicator
-       // Spacer()
-
-       // Removed inline KeyBoardView here per instructions
-
-        // Staff and note drawing (panel removed)
-        VStack(spacing: 12) {
-          Canvas { context, size in
-            // Center the entire staff/note drawing within the canvas
-            let centerX = size.width / 2
-            let centerY = size.height / 2
-            let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
-            let offsetX = centerX - noteX
-            let offsetY = centerY - originalGroupMidY
-            context.translateBy(x: offsetX, y: offsetY)
-
-            // Add subtle shadow to improve contrast on dark background
-            if colorScheme == .dark {
-              context.addFilter(.shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 1))
-            } else {
-              context.addFilter(.shadow(color: .black.opacity(0.10), radius: 0.8, x: 0, y: 0.5))
-            }
-
-            // Draw both staffs
-            context.draw(trebleStaff, at: trebleStaffPoint)
-            context.draw(bassStaff, at: bassStaffPoint)
-
-            if showDebugOverlays {
-              // Draw staff line guides (green) for both staffs
-              let stroke: CGFloat = 0.5
-              let trebleYs = vm.staffLineYs(for: .treble)
-              for y in trebleYs {
-                let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
-                context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+        
+        // Existing content
+        VStack(spacing: 16) {
+          midiReceivedIndicator
+          // Spacer()
+          
+          // Removed inline KeyBoardView here per instructions
+          
+          // Staff and note drawing (panel removed)
+          VStack(spacing: 12) {
+            Canvas { context, size in
+              // Center the entire staff/note drawing within the canvas
+              let centerX = size.width / 2
+              let centerY = size.height / 2
+              let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
+              let offsetX = centerX - noteX
+              let offsetY = centerY - originalGroupMidY
+              context.translateBy(x: offsetX, y: offsetY)
+              
+              // Add subtle shadow to improve contrast on dark background
+              if colorScheme == .dark {
+                context.addFilter(.shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 1))
+              } else {
+                context.addFilter(.shadow(color: .black.opacity(0.10), radius: 0.8, x: 0, y: 0.5))
               }
-              let bassYs = vm.staffLineYs(for: .bass)
-              for y in bassYs {
-                let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
-                context.fill(Path(rect), with: .color(.green.opacity(0.8)))
-              }
-
-              // Draw computed ledger line positions (red), centered on Y
-              let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
-              for y in ledgerYs {
-                let stroke: CGFloat = 1.1
-                let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
-                context.fill(Path(rect), with: .color(.red.opacity(0.7)))
-              }
-
-              // Draw the computed note center (blue crosshair)
-              let ny = vm.currentY
-              let crossW: CGFloat = 10
-              let crossH: CGFloat = 10
-              let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
-              let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
-              context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
-              context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
-            }
-
-            // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
-            let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
-            let isDark = colorScheme == .dark
-            let ledgerStroke: CGFloat = isDark ? 1.6 : 1.4
-            let ledgerColor: Color = .white.opacity(0.85)
-            let ledgerLength: CGFloat = lineWidth * 0.85
-            for y in ledgerYs {
-              var p = Path()
-              p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
-              p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
-              context.stroke(p, with: .color(ledgerColor), lineWidth: ledgerStroke)
-            }
-
-            // Draw accidental if needed just to the left of the note
-            let acc = vm.currentNote.accidental
-            let notePoint = CGPoint(x: noteX, y: vm.currentY)
-            let noteText = currentNoteSymbol.text()
-            if acc == "♯" {
-              let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-              context.draw(sharpText, at: accPoint, anchor: .center)
-            } else if acc == "♭" {
-              let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-              context.draw(flatText, at: accPoint, anchor: .center)
-            } else if acc == "♮" {
-              let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
-              context.draw(naturalText, at: accPoint, anchor: .center)
-            }
-            context.draw(noteText, at: notePoint, anchor: .center)
-          }
-          .frame(height: 320)
-          .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
-          .foregroundStyle(.white)
-
-          // Labels for clef, note name and MIDI code
-          HStack(spacing: 12) {
-            Text("Clef:")
-            Text(vm.currentClef == .treble ? "Treble" : "Bass")
-            Text("Note:")
-            Text(vm.currentNote.name).monospaced()
-            Text("MIDI:")
-            Text(String(vm.currentNote.midi)).monospaced()
-          }
-
-          // Received values from MIDI to compare with the random note above
-          HStack(spacing: 12) {
-            Text("Received Clef:")
-            Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
-            Text("Received Note:")
-            Text(noteName(from: conductor.data.noteOn))
-              .monospaced()
-            Text("Received MIDI:")
-            Text(String(conductor.data.noteOn))
-              .monospaced()
-          }
-        }
-        .padding(.horizontal)
-        .foregroundStyle(.white)
-
-        // Practice mode controls or free play button
-        if isPracticeMode {
-          HStack(spacing: 12) {
-            Text("Practice")
-            
-            HStack(spacing: 8) {
-                Text("Count:")
-                Text("\(practiceCount)")
-                    .monospaced()
-
-                HStack(spacing: 6) {
-                    Button {
-                        practiceCount = max(5, practiceCount - 5)
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(6)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        practiceCount = min(100, practiceCount + 5)
-                    } label: {
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(6)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
+              
+              // Draw both staffs
+              context.draw(trebleStaff, at: trebleStaffPoint)
+              context.draw(bassStaff, at: bassStaffPoint)
+              
+              if showDebugOverlays {
+                // Draw staff line guides (green) for both staffs
+                let stroke: CGFloat = 0.5
+                let trebleYs = vm.staffLineYs(for: .treble)
+                for y in trebleYs {
+                  let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+                  context.fill(Path(rect), with: .color(.green.opacity(0.8)))
                 }
+                let bassYs = vm.staffLineYs(for: .bass)
+                for y in bassYs {
+                  let rect = CGRect(x: noteX - 120, y: y - stroke/2, width: 240, height: stroke)
+                  context.fill(Path(rect), with: .color(.green.opacity(0.8)))
+                }
+                
+                // Draw computed ledger line positions (red), centered on Y
+                let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+                for y in ledgerYs {
+                  let stroke: CGFloat = 1.1
+                  let rect = CGRect(x: noteX - 40, y: y - stroke/2, width: 80, height: stroke)
+                  context.fill(Path(rect), with: .color(.red.opacity(0.7)))
+                }
+                
+                // Draw the computed note center (blue crosshair)
+                let ny = vm.currentY
+                let crossW: CGFloat = 10
+                let crossH: CGFloat = 10
+                let hPath = Path(CGRect(x: noteX - crossW/2, y: ny, width: crossW, height: 0.75))
+                let vPath = Path(CGRect(x: noteX, y: ny - crossH/2, width: 0.75, height: crossH))
+                context.stroke(hPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+                context.stroke(vPath, with: .color(.blue.opacity(0.7)), lineWidth: 0.75)
+              }
+              
+              // Draw ledger lines (if any) as vector strokes for pixel-perfect alignment
+              let ledgerYs = vm.ledgerLineYs(for: vm.currentNote.midi, clef: vm.currentClef)
+              let isDark = colorScheme == .dark
+              let ledgerStroke: CGFloat = isDark ? 1.6 : 1.4
+              let ledgerColor: Color = .white.opacity(0.85)
+              let ledgerLength: CGFloat = lineWidth * 0.85
+              for y in ledgerYs {
+                var p = Path()
+                p.move(to: CGPoint(x: noteX - ledgerLength/2, y: y))
+                p.addLine(to: CGPoint(x: noteX + ledgerLength/2, y: y))
+                context.stroke(p, with: .color(ledgerColor), lineWidth: ledgerStroke)
+              }
+              
+              // Draw accidental if needed just to the left of the note
+              let acc = vm.currentNote.accidental
+              let notePoint = CGPoint(x: noteX, y: vm.currentY)
+              let noteText = currentNoteSymbol.text()
+              if acc == "♯" {
+                let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+                context.draw(sharpText, at: accPoint, anchor: .center)
+              } else if acc == "♭" {
+                let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+                context.draw(flatText, at: accPoint, anchor: .center)
+              } else if acc == "♮" {
+                let accPoint = CGPoint(x: noteX - 18, y: vm.currentY)
+                context.draw(naturalText, at: accPoint, anchor: .center)
+              }
+              context.draw(noteText, at: notePoint, anchor: .center)
             }
+            .frame(height: 320)
+            .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
             
-            Button("Start Practice") {
-              startPractice()
+            // Labels for clef, note name and MIDI code
+            HStack(spacing: 12) {
+              Text("Clef:")
+              Text(vm.currentClef == .treble ? "Treble" : "Bass")
+              Text("Note:")
+              Text(vm.currentNote.name).monospaced()
+              Text("MIDI:")
+              Text(String(vm.currentNote.midi)).monospaced()
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.white.opacity(0.88))
+            
+            // Received values from MIDI to compare with the random note above
+            HStack(spacing: 12) {
+              Text("Received Clef:")
+              Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
+              Text("Received Note:")
+              Text(noteName(from: conductor.data.noteOn))
+                .monospaced()
+              Text("Received MIDI:")
+              Text(String(conductor.data.noteOn))
+                .monospaced()
+            }
           }
-          .frame(height: 56)
-        } else {
-          VStack(spacing: 12) {
-            // Free play button
-            Button("New Note") {
-              withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-                randomizeNoteRespectingCalibration()
-              }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.white.opacity(0.88))
-
-            // Practice mode controls
+          .padding(.horizontal)
+          .foregroundStyle(.white)
+          
+          // Practice mode controls or free play button
+          if isPracticeMode {
             HStack(spacing: 12) {
               Text("Practice")
+              
               HStack(spacing: 8) {
-                  Text("Count:")
-                  Text("\(practiceCount)")
-                      .monospaced()
-
-                  HStack(spacing: 6) {
-                      Button {
-                          practiceCount = max(5, practiceCount - 5)
-                      } label: {
-                          Image(systemName: "chevron.down")
-                              .font(.system(size: 12, weight: .semibold))
-                              .foregroundStyle(.white)
-                              .padding(6)
-                              .background(Color.white.opacity(0.12))
-                              .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                      }
-                      .buttonStyle(.plain)
-
-                      Button {
-                          practiceCount = min(100, practiceCount + 5)
-                      } label: {
-                          Image(systemName: "chevron.up")
-                              .font(.system(size: 12, weight: .semibold))
-                              .foregroundStyle(.white)
-                              .padding(6)
-                              .background(Color.white.opacity(0.12))
-                              .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                      }
-                      .buttonStyle(.plain)
+                Text("Count:")
+                Text("\(practiceCount)")
+                  .monospaced()
+                
+                HStack(spacing: 6) {
+                  Button {
+                    practiceCount = max(5, practiceCount - 5)
+                  } label: {
+                    Image(systemName: "chevron.down")
+                      .font(.system(size: 12, weight: .semibold))
+                      .foregroundStyle(.white)
+                      .padding(6)
+                      .background(Color.white.opacity(0.12))
+                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                   }
+                  .buttonStyle(.plain)
+                  
+                  Button {
+                    practiceCount = min(100, practiceCount + 5)
+                  } label: {
+                    Image(systemName: "chevron.up")
+                      .font(.system(size: 12, weight: .semibold))
+                      .foregroundStyle(.white)
+                      .padding(6)
+                      .background(Color.white.opacity(0.12))
+                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                  }
+                  .buttonStyle(.plain)
+                }
               }
               .foregroundStyle(.white)
               
@@ -797,228 +753,276 @@ struct ContentView: View {
               .buttonStyle(.borderedProminent)
               .tint(.white.opacity(0.88))
             }
-          }
-          .foregroundStyle(.white)
-          .tint(.white.opacity(0.9))
-          .frame(height: 56)
-        }
-
-        Spacer()
-      } // VStack
-      .safeAreaInset(edge: .bottom) {
-        KeyBoardView(isCorrect: { midi in
-            midi == vm.currentNote.midi
-        }, docked: true)
-        .environmentObject(appData)
-        .environmentObject(conductor)
-      }
-      .onAppear {
-        vm.setAllowedMIDIRange(appData.calibratedRange)
-        vm.setIncludeAccidentals(appData.includeAccidentals)
-        randomizeNoteRespectingCalibration()
-        conductor.start()
-      }
-      .onChange(of: appData.minMIDINote) { _, _ in
-        vm.setAllowedMIDIRange(appData.calibratedRange)
-        randomizeNoteRespectingCalibration()
-      }
-      .onChange(of: appData.maxMIDINote) { _, _ in
-        vm.setAllowedMIDIRange(appData.calibratedRange)
-        randomizeNoteRespectingCalibration()
-      }
-      .onChange(of: appData.includeAccidentals) { _, newValue in
-        vm.setIncludeAccidentals(newValue)
-        randomizeNoteRespectingCalibration()
-      }
-      .onChange(of: conductor.noteOnEventID) { _, _ in
-        // Read the latest note value for this event (fires even for repeated same MIDI note)
-        let newValue = conductor.data.noteOn
-        // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
-        guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
-
-        if isPracticeMode {
-          // Handle practice mode input
-          handlePracticeInput(newValue)
-        } else {
-          // Handle free play mode input
-          let playedName = noteName(from: newValue)
-          let correct = (newValue == vm.currentNote.midi)
-          isCorrect = correct
-
-          // Build feedback message and color
-          if correct {
-            feedbackMessage = "You played \(playedName). That is correct! Try the next note now."
-            feedbackColor = .green
+            .frame(height: 56)
           } else {
-            feedbackMessage = "You played \(playedName). That is incorrect, try again."
-            feedbackColor = .red
-          }
-
-          // Auto-advance immediately if the played note matches the current target note
-          guard correct else { return }
-
-          withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-            // Advance to the next target; keep last feedback visible
-            randomizeNoteRespectingCalibration()
-          }
-        }
-      }
-      .onDisappear {
-        conductor.stop()
-      }
-      .padding()
-    }
-  }
-  var midiReceivedIndicator: some View {
-      HStack(alignment: .center) {
-          // Left-aligned MIDI In indicator
-          HStack(spacing: 15) {
-              Text("MIDI In")
-                  .fontWeight(.semibold)
-              Circle()
-                  .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
-                  .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
-                  .frame(maxWidth: 20, maxHeight: 20)
-          }
-
-          Spacer()
-
-          // Centered Note style picker (replaced with custom segmented control)
-          HStack(spacing: 8) {
-              Text("Note Type:")
-                .font(.callout)
-                .fontWeight(.semibold)
-              // Removed old ZStack with Picker and replaced per instructions:
-              HStack(spacing: 0) {
-                  ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
-                      let isSelected = appData.noteHeadStyle == style
-                      Button(action: { appData.noteHeadStyle = style }) {
-                          Text({
-                              switch style {
-                              case .whole: return "Whole"
-                              case .half: return "Half"
-                              case .quarter: return "Quarter"
-                              }
-                          }())
-                          .font(.callout)
-                          .fontWeight(.semibold)
-                          .frame(width: 200/3, height: 28)
-                          .contentShape(Rectangle())
-                          .foregroundColor(isSelected ? .black : .white)
-                          .background(
-                              Group {
-                                  if isSelected {
-                                      RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                          .fill(Color.white)
-                                          .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)
-                                  } else {
-                                      Color.clear
-                                  }
-                              }
-                          )
-                      }
-                      .buttonStyle(.plain)
-                  }
-              }
-              .padding(3)
-              .background(Color.white.opacity(0.10))
-              .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-#if os(macOS)
-              Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
-                  .controlSize(.small)
-                  .background(Color.clear)
-#else
-              Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
-                  .controlSize(.small)
-                  .background(Color.clear)
-#endif
-          }
-
-          Spacer()
-
-          // Right-aligned controls
-          HStack(spacing: 12) {
-              Text(calibrationDisplayText)
-              .font(.subheadline)
-                  .foregroundColor(.white)
-                  //.lineLimit(1)
-                  .frame(width: 130)
-
-              Button("History") { 
-                  showingPracticeHistory = true 
+            VStack(spacing: 12) {
+              // Free play button
+              Button("New Note") {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+                  randomizeNoteRespectingCalibration()
+                }
               }
               .buttonStyle(.borderedProminent)
               .tint(.white.opacity(0.88))
-
-              Button("Calibrate") { showingCalibration = true }
-                  .buttonStyle(.borderedProminent)
-                  .tint(.white.opacity(0.88))
+              
+              // Practice mode controls
+              HStack(spacing: 12) {
+                Text("Practice")
+                HStack(spacing: 8) {
+                  Text("Count:")
+                  Text("\(practiceCount)")
+                    .monospaced()
+                  
+                  HStack(spacing: 6) {
+                    Button {
+                      practiceCount = max(5, practiceCount - 5)
+                    } label: {
+                      Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                      practiceCount = min(100, practiceCount + 5)
+                    } label: {
+                      Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                  }
+                }
+                .foregroundStyle(.white)
+                
+                Button("Start Practice") {
+                  startPractice()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.88))
+              }
+            }
+            .foregroundStyle(.white)
+            .tint(.white.opacity(0.9))
+            .frame(height: 56)
           }
-      }
-      .padding([.top, .horizontal], 20)
-      .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
-      //.foregroundStyle(colorScheme == .dark ? .primary : .black.opacity(0.85))  // replaced above
-      .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
-      .sheet(isPresented: $showingCalibration) {
-          CalibrationWizardView(isPresented: $showingCalibration)
-              .environmentObject(appData)
-      }
-      .sheet(isPresented: $showingResults) {
-          PracticeResultsView(
-              attempts: practiceAttempts,
-              settings: practiceSettings,
-              sessionStartDate: practiceStartDate
-          )
-      }
-      .sheet(isPresented: $showingPracticeHistory) {
-          PracticeHistoryView()
-      }
-      .foregroundStyle(.white)
-      .tint(.white.opacity(0.9))
-  }
-
-  // Staff drawing control (positions match your previous staff anchors)
-  private let trebleStaffPoint = CGPoint(x: 155, y: 150)
-  private let bassStaffPoint   = CGPoint(x: 155, y: 230)
-  private let lineWidth: CGFloat = 24 // approximate width of a ledger line glyph
-
-}
-
-private extension View {
-    @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
+          
+          Spacer()
+        } // VStack
+        .safeAreaInset(edge: .bottom) {
+          KeyBoardView(isCorrect: { midi in
+            midi == vm.currentNote.midi
+          }, docked: true)
+          .environmentObject(appData)
+          .environmentObject(conductor)
         }
+        .onAppear {
+          vm.setAllowedMIDIRange(appData.calibratedRange)
+          vm.setIncludeAccidentals(appData.includeAccidentals)
+          randomizeNoteRespectingCalibration()
+          conductor.start()
+        }
+        .onChange(of: appData.minMIDINote) { _, _ in
+          vm.setAllowedMIDIRange(appData.calibratedRange)
+          randomizeNoteRespectingCalibration()
+        }
+        .onChange(of: appData.maxMIDINote) { _, _ in
+          vm.setAllowedMIDIRange(appData.calibratedRange)
+          randomizeNoteRespectingCalibration()
+        }
+        .onChange(of: appData.includeAccidentals) { _, newValue in
+          vm.setIncludeAccidentals(newValue)
+          randomizeNoteRespectingCalibration()
+        }
+        .onChange(of: conductor.noteOnEventID) { _, _ in
+          // Read the latest note value for this event (fires even for repeated same MIDI note)
+          let newValue = conductor.data.noteOn
+          // Only respond to real Note On events (some devices send Note On with velocity 0 as Note Off)
+          guard conductor.midiEventType == .noteOn, conductor.data.velocity > 0 else { return }
+          
+          if isPracticeMode {
+            // Handle practice mode input
+            handlePracticeInput(newValue)
+          } else {
+            // Handle free play mode input
+            let playedName = noteName(from: newValue)
+            let correct = (newValue == vm.currentNote.midi)
+            isCorrect = correct
+            
+            // Build feedback message and color
+            if correct {
+              feedbackMessage = "You played \(playedName). That is correct! Try the next note now."
+              feedbackColor = .green
+            } else {
+              feedbackMessage = "You played \(playedName). That is incorrect, try again."
+              feedbackColor = .red
+            }
+            
+            // Auto-advance immediately if the played note matches the current target note
+            guard correct else { return }
+            
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+              // Advance to the next target; keep last feedback visible
+              randomizeNoteRespectingCalibration()
+            }
+          }
+        }
+        .onDisappear {
+          conductor.stop()
+        }
+        .padding()
+        .navigationDestination(for: NavigationDestination.self) { destination in
+          switch destination {
+            case .calibration:
+              CalibrationWizardView(navigationPath: $navigationPath)
+                .environmentObject(appData)
+                .environmentObject(conductor)
+            case .history:
+              PracticeHistoryView(navigationPath: $navigationPath)
+          }
+        }
+        .sheet(isPresented: $showingResults) {
+          PracticeResultsView(
+            attempts: practiceAttempts,
+            settings: practiceSettings,
+            sessionStartDate: practiceStartDate
+          )
+        }
+      } // ZStack
+    } // NavigationStack
+  } // body
+  
+  var midiReceivedIndicator: some View {
+    HStack(alignment: .center) {
+      // Left-aligned MIDI In indicator
+      HStack(spacing: 15) {
+        Text("MIDI In")
+          .fontWeight(.semibold)
+        Circle()
+          .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
+          .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
+          .frame(maxWidth: 20, maxHeight: 20)
+      }
+      
+      Spacer()
+      
+      // Centered Note style picker (replaced with custom segmented control)
+      HStack(spacing: 8) {
+        Text("Note Type:")
+          .font(.callout)
+          .fontWeight(.semibold)
+        // Removed old ZStack with Picker and replaced per instructions:
+        HStack(spacing: 0) {
+          ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
+            let isSelected = appData.noteHeadStyle == style
+            Button(action: { appData.noteHeadStyle = style }) {
+              Text({
+                switch style {
+                  case .whole: return "Whole"
+                  case .half: return "Half"
+                  case .quarter: return "Quarter"
+                }
+              }())
+              .font(.callout)
+              .fontWeight(.semibold)
+              .frame(width: 200/3, height: 28)
+              .contentShape(Rectangle())
+              .foregroundColor(isSelected ? .black : .white)
+              .background(
+                Group {
+                  if isSelected {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                      .fill(Color.white)
+                      .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)
+                  } else {
+                    Color.clear
+                  }
+                }
+              )
+            }
+            .buttonStyle(.plain)
+          }
+        }
+        .padding(3)
+        .background(Color.white.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        
+        Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
+          .controlSize(.small)
+      }
+      
+      Spacer()
+      
+      // Right-aligned controls
+      HStack(spacing: 12) {
+        Text(calibrationDisplayText)
+          .font(.subheadline)
+          .foregroundColor(.white)
+        //.lineLimit(1)
+          .frame(width: 130)
+        
+        Button("History") {
+          navigationPath.append(NavigationDestination.history)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.white.opacity(0.88))
+        
+        Button("Calibrate") {
+          navigationPath.append(NavigationDestination.calibration)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.white.opacity(0.88))
+      }
     }
-}
-
-#Preview("Whole") {
+    .padding([.top, .horizontal], 20)
+    .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
+    .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
+    .foregroundStyle(.white)
+    .tint(.white.opacity(0.9))
+  }
+} // ContentView
+  
+  #Preview("Whole") {
     let data = AppData()
     data.noteHeadStyle = .whole
     return ContentView()
-        .environmentObject(data)
-        .environmentObject(MIDIMonitorConductor())
-        .frame(width: 900, height: 900)
-}
-
-#Preview("Half") {
+      .environmentObject(data)
+      .environmentObject(MIDIMonitorConductor())
+      .frame(width: 900, height: 900)
+  }
+  
+  #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
     return ContentView()
-        .environmentObject(data)
-        .environmentObject(MIDIMonitorConductor())
-        .frame(width: 900, height: 900)
-}
-
-#Preview("Quarter") {
+      .environmentObject(data)
+      .environmentObject(MIDIMonitorConductor())
+      .frame(width: 900, height: 900)
+  }
+  
+  #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
     return ContentView()
-        .environmentObject(data)
-        .environmentObject(MIDIMonitorConductor())
-        .frame(width: 900, height: 900)
-}
+      .environmentObject(data)
+      .environmentObject(MIDIMonitorConductor())
+      .frame(width: 900, height: 900)
+  }
 
+// MARK: - View Extension
+private extension View {
+  @ViewBuilder
+  func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+    if condition {
+      transform(self)
+    } else {
+      self
+    }
+  }
+}
