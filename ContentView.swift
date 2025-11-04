@@ -712,47 +712,19 @@ struct ContentView: View {
           // Practice mode controls or free play button
           if isPracticeMode {
             HStack(spacing: 12) {
-              Text("Practice")
+              Text("Practice Mode")
+                .fontWeight(.semibold)
               
-              HStack(spacing: 8) {
-                Text("Count:")
-                Text("\(practiceCount)")
-                  .monospaced()
-                
-                HStack(spacing: 6) {
-                  Button {
-                    practiceCount = max(5, practiceCount - 5)
-                  } label: {
-                    Image(systemName: "chevron.down")
-                      .font(.system(size: 12, weight: .semibold))
-                      .foregroundStyle(.white)
-                      .padding(6)
-                      .background(Color.white.opacity(0.12))
-                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                  }
-                  .buttonStyle(.plain)
-                  
-                  Button {
-                    practiceCount = min(100, practiceCount + 5)
-                  } label: {
-                    Image(systemName: "chevron.up")
-                      .font(.system(size: 12, weight: .semibold))
-                      .foregroundStyle(.white)
-                      .padding(6)
-                      .background(Color.white.opacity(0.12))
-                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                  }
-                  .buttonStyle(.plain)
-                }
-              }
-              .foregroundStyle(.white)
+              Text("Note \(currentPracticeIndex + 1) of \(practiceCount)")
+                .monospaced()
               
-              Button("Start Practice") {
-                startPractice()
+              Button("Exit Practice") {
+                exitPracticeMode()
               }
               .buttonStyle(.borderedProminent)
-              .tint(.white.opacity(0.88))
+              .tint(.red.opacity(0.88))
             }
+            .foregroundStyle(.white)
             .frame(height: 56)
           } else {
             VStack(spacing: 12) {

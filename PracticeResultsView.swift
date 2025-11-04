@@ -197,9 +197,10 @@ struct StatisticsSheet: View {
     let noteName: (Int) -> String
 
     @AppStorage("statsShowThumbnails") private var showThumbnails: Bool = false
-    @State private var userOverrodeThumbnailPref: Bool = false
+    @AppStorage("statsUserOverrideThumbnails") private var userOverrodeThumbnailPref: Bool = false
     private let thumbnailAutoWidthThreshold: CGFloat = 900
 
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var scope: Int = 0 // 0 = This Session, 1 = All Time
     @State private var isLoadingLifetime = false
@@ -492,27 +493,37 @@ struct StatisticsSheet: View {
                     }
                 }
                 .onAppear {
+                    // Preload if user lands in All Time
+                    if scope == 1 { loadLifetime() }
+                    
+                    // Only apply width-based behavior if the user hasn't explicitly set a preference yet
                     if !userOverrodeThumbnailPref {
-                        showThumbnails = width >= thumbnailAutoWidthThreshold
+                        // If window is wide enough, enable thumbnails; otherwise keep the saved value
+                        if width >= thumbnailAutoWidthThreshold {
+                            showThumbnails = true
+                        }
+                        // If width is small, keep whatever value is already in AppStorage (including false default)
+                    }
+                }
+        }
+            .navigationTitle("Session Statistics")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
                     }
                 }
             }
-            .navigationTitle("Statistics")
-            .toolbar {
-#if os(macOS)
-    ToolbarItem(placement: .automatic) { Button("Done") { dismiss() } }
-#else
-    ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
-#endif
-            }
-            .onAppear {
-                // Preload if user lands in All Time
-                if scope == 1 { loadLifetime() }
-            }
         }
+            .navigationTitle("Session Statistics")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
     }
-
-    @Environment(\.dismiss) private var dismiss
 }
 
 struct StaffThumbnailView: View {

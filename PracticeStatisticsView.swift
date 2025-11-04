@@ -13,7 +13,7 @@ struct PracticeStatisticsView: View {
     @State private var lifetimePlayedToMistakenTargets: [Int: [Int: Int]] = [:]
 
     @AppStorage("statsShowThumbnails") private var showThumbnails: Bool = false
-    @State private var userOverrodeThumbnailPref: Bool = false
+    @AppStorage("statsUserOverrideThumbnails") private var userOverrodeThumbnailPref: Bool = false
     private let thumbnailAutoWidthThreshold: CGFloat = 900
     
     var body: some View {
@@ -52,8 +52,13 @@ struct PracticeStatisticsView: View {
                 }
             }
             .onAppear {
+                // Only apply width-based behavior if the user hasn't explicitly set a preference yet
                 if !userOverrodeThumbnailPref {
-                    showThumbnails = width >= thumbnailAutoWidthThreshold
+                    // If window is wide enough, enable thumbnails; otherwise keep the saved value
+                    if width >= thumbnailAutoWidthThreshold {
+                        showThumbnails = true
+                    }
+                    // If width is small, keep whatever value is already in AppStorage (including false default)
                 }
             }
         }
