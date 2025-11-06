@@ -164,7 +164,7 @@ struct PracticeHistoryView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(.quaternary)
             
             List {
                 ForEach(sessions) { session in
