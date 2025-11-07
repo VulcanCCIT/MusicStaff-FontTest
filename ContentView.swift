@@ -722,7 +722,9 @@ struct ContentView: View {
                 exitPracticeMode()
               }
               .buttonStyle(.borderedProminent)
-              .tint(.red.opacity(0.88))
+              .tint(.white)
+              .foregroundStyle(.red)
+              .controlSize(.regular)
             }
             .foregroundStyle(.white)
             .frame(height: 56)
@@ -735,7 +737,9 @@ struct ContentView: View {
                 }
               }
               .buttonStyle(.borderedProminent)
-              .tint(.white.opacity(0.88))
+              .tint(.white)
+              .foregroundStyle(.black)
+              .controlSize(.regular)
               
               // Practice mode controls
               HStack(spacing: 12) {
@@ -777,11 +781,13 @@ struct ContentView: View {
                   startPractice()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.white.opacity(0.88))
+                .tint(.white)
+                .foregroundStyle(.black)
+                .controlSize(.regular)
               }
             }
             .foregroundStyle(.white)
-            .tint(.white.opacity(0.9))
+            .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
             .frame(height: 56)
           }
           
@@ -884,12 +890,11 @@ struct ContentView: View {
       
       Spacer()
       
-      // Centered Note style picker (replaced with custom segmented control)
+      // Centered Note style picker (custom segmented control)
       HStack(spacing: 8) {
         Text("Note Type:")
           .font(.callout)
           .fontWeight(.semibold)
-        // Removed old ZStack with Picker and replaced per instructions:
         HStack(spacing: 0) {
           ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
             let isSelected = appData.noteHeadStyle == style
@@ -902,16 +907,15 @@ struct ContentView: View {
                 }
               }())
               .font(.callout)
-              .fontWeight(.semibold)
+              .fontWeight(.medium)
               .frame(width: 200/3, height: 28)
               .contentShape(Rectangle())
-              .foregroundColor(isSelected ? .black : .white)
+              .foregroundColor(isSelected ? .black : .white.opacity(0.7))
               .background(
                 Group {
                   if isSelected {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                      .fill(Color.white)
-                      .shadow(color: .black.opacity(0.25), radius: 1.5, x: 0, y: 0.5)
+                      .fill(.white)
                   } else {
                     Color.clear
                   }
@@ -922,7 +926,7 @@ struct ContentView: View {
           }
         }
         .padding(3)
-        .background(Color.white.opacity(0.10))
+        .background(Color.white.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         
         Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
@@ -943,13 +947,17 @@ struct ContentView: View {
           navigationPath.append(NavigationDestination.history)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.white.opacity(0.88))
+        .tint(.white)
+        .foregroundStyle(.black)
+        .controlSize(.regular)
         
         Button("Calibrate") {
           navigationPath.append(NavigationDestination.calibration)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.white.opacity(0.88))
+        .tint(.white)
+        .foregroundStyle(.black)
+        .controlSize(.regular)
       }
     }
     .padding([.top, .horizontal], 20)
@@ -998,3 +1006,4 @@ private extension View {
     }
   }
 }
+
