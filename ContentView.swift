@@ -634,15 +634,18 @@ struct ContentView: View {
               let centerY = size.height / 2
               let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
               let offsetX = centerX - noteX
-              
-              // iPad-specific: shift staff down to provide more room at top for high note tails
-              #if os(macOS)
               let offsetY = centerY - originalGroupMidY
-              #else
-              let offsetY = centerY - originalGroupMidY + 30 // Shift down by 30 points on iPad to prevent clipping
-              #endif
               
+              // iPad-specific: scale down the staff to fit more vertical range within the same canvas height
+              #if os(macOS)
               context.translateBy(x: offsetX, y: offsetY)
+              #else
+              let scale: CGFloat = 0.70 // Scale down by 30% on iPad to accommodate full 88-key range
+              let verticalShift: CGFloat = 10 // Shift staff down by 10 points to give more clearance at top
+              context.translateBy(x: centerX, y: centerY + verticalShift)
+              context.scaleBy(x: scale, y: scale)
+              context.translateBy(x: -noteX, y: -originalGroupMidY)
+              #endif
               
               // Add subtle shadow to improve contrast on dark background
               if colorScheme == .dark {
