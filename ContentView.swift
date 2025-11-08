@@ -634,7 +634,14 @@ struct ContentView: View {
               let centerY = size.height / 2
               let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
               let offsetX = centerX - noteX
+              
+              // iPad-specific: shift staff down to provide more room at top for high note tails
+              #if os(macOS)
               let offsetY = centerY - originalGroupMidY
+              #else
+              let offsetY = centerY - originalGroupMidY + 30 // Shift down by 30 points on iPad to prevent clipping
+              #endif
+              
               context.translateBy(x: offsetX, y: offsetY)
               
               // Add subtle shadow to improve contrast on dark background
