@@ -41,6 +41,7 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     let engine = AudioEngine()
     var instrument = AppleSampler()
     private var engineStarted = false
+    private var instrumentLoaded = false
 
     // Scale external MIDI velocities to match on-screen loudness
     @Published var externalVelocityBoost: Double = 2.25
@@ -61,20 +62,30 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     init() {
         // Configure audio chain
         engine.output = instrument
-        // Try loading the instrument (SoundFont)
+        loadInstrument()
+    }
+    
+    private func loadInstrument() {
+        // Load the instrument (SoundFont) - safe to call multiple times
+        guard !instrumentLoaded else { return }
+        
         do {
             if let url = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
                 try instrument.loadInstrument(url: url)
+                instrumentLoaded = true
                 Log("Loaded instrument Successfully!")
             } else {
-                Log("Could not find file")
+                Log("Could not find SoundFont file")
             }
         } catch {
-            Log("Could not load instrument")
+            Log("Could not load instrument: \(error.localizedDescription)")
         }
     }
 
     func start() {
+        // Ensure instrument is loaded (idempotent)
+        loadInstrument()
+        
         midi.openInput(name: "Bluetooth")
         midi.openInput()
         midi.addListener(self)
@@ -83,9 +94,13 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             do {
                 try engine.start()
                 engineStarted = true
+                Log("Audio engine started successfully")
             } catch {
                 Log("Audio engine failed to start: \(error.localizedDescription)")
             }
+        } else {
+            // Engine already running - this is fine, we just needed to ensure instrument is loaded
+            Log("Audio engine already running")
         }
     }
 
@@ -95,6 +110,7 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         if engineStarted {
             engine.stop()
             engineStarted = false
+            Log("Audio engine stopped")
         }
     }
 
@@ -823,7 +839,6 @@ struct ContentView: View {
           vm.setAllowedMIDIRange(appData.calibratedRange)
           vm.setIncludeAccidentals(appData.includeAccidentals)
           randomizeNoteRespectingCalibration()
-          conductor.start()
         }
         .onChange(of: appData.minMIDINote) { _, _ in
           vm.setAllowedMIDIRange(appData.calibratedRange)
@@ -869,9 +884,6 @@ struct ContentView: View {
               randomizeNoteRespectingCalibration()
             }
           }
-        }
-        .onDisappear {
-          conductor.stop()
         }
         .navigationDestination(for: NavigationDestination.self) { destination in
           switch destination {

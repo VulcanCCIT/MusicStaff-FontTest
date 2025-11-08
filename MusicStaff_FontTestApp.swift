@@ -33,6 +33,10 @@ struct MusicStaff_FontTestApp: App {
             ContentView()
                 .environmentObject(appData)
                 .environmentObject(conductor)
+                .onAppear {
+                    // Ensure conductor is started when the app launches
+                    conductor.start()
+                }
         }
         .modelContainer(sharedModelContainer)
     }
