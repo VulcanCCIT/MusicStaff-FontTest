@@ -332,8 +332,8 @@ struct KeyBoardView: View {
         #if os(macOS)
         .padding(.bottom, docked ? 0 : (is3DMode ? 40 : 28))
         #else
-        // 3D mode needs slightly more bottom padding due to perspective rendering
-        .padding(.bottom, docked ? (is3DMode ? 38 : 35) : (is3DMode ? 40 : 28))
+        // 2D mode needs MORE bottom padding than 3D due to flat rendering showing labels lower
+        .padding(.bottom, docked ? (is3DMode ? 38 : 42) : (is3DMode ? 40 : 28))
         #endif
       }
       .background(
@@ -348,7 +348,7 @@ struct KeyBoardView: View {
       }
       #if os(iOS)
       // Critical: Add safe area padding at the bottom on iPad to prevent clipping
-      .safeAreaPadding(.bottom, docked ? 24 : 0) // Slightly increased for better label visibility
+      .safeAreaPadding(.bottom, docked ? 44 : 0) // Increased to 44 for comfortable spacing from iPad edge
       #endif
       .clipShape(
         UnevenRoundedRectangle(
