@@ -798,6 +798,9 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
             .frame(height: 56)
+            #if os(iOS)
+            .padding(.bottom, 5) // Balanced space between practice controls and keyboard on iPad
+            #endif
           }
           
           Spacer()
