@@ -348,7 +348,7 @@ struct KeyBoardView: View {
       }
       #if os(iOS)
       // Critical: Add safe area padding at the bottom on iPad to prevent clipping
-      .safeAreaPadding(.bottom, docked ? 44 : 0) // Increased to 44 for comfortable spacing from iPad edge
+      .safeAreaPadding(.bottom, docked ? 60 : 0) // Increased to 60 for comfortable spacing from iPad edge
       #endif
       .clipShape(
         UnevenRoundedRectangle(

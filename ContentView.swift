@@ -593,8 +593,8 @@ struct ContentView: View {
         // Existing content
         VStack(spacing: 12) { // Reduced from 16 to 12 to give more vertical room
           #if os(iOS)
-          // Add breathing room at top on iPad to prevent clipping
-          Color.clear.frame(height: 8)
+          // Minimal breathing room at top on iPad to prevent clipping
+          Color.clear.frame(height: 4)
           #endif
           midiReceivedIndicator
           // Spacer()
@@ -690,12 +690,29 @@ struct ContentView: View {
             
             // Labels for clef, note name and MIDI code
             HStack(spacing: 12) {
+              Spacer()
+              
               Text("Clef:")
               Text(vm.currentClef == .treble ? "Treble" : "Bass")
               Text("Note:")
               Text(vm.currentNote.name).monospaced()
               Text("MIDI:")
               Text(String(vm.currentNote.midi)).monospaced()
+              
+              // New Note button centered with the text
+              if !isPracticeMode {
+                Button("New Note") {
+                  withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
+                    randomizeNoteRespectingCalibration()
+                  }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white)
+                .foregroundStyle(.black)
+                .controlSize(.regular)
+              }
+              
+              Spacer()
             }
             
             // Received values from MIDI to compare with the random note above
@@ -733,73 +750,55 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .frame(height: 56)
           } else {
-            VStack(spacing: 6) { // Reduced from 12 to make room for spacers
-              #if os(iOS)
-              // Small spacer above for breathing room on iPad
-              Spacer().frame(height: 8)
-              #endif
-              
-              // Free play button
-              Button("New Note") {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {
-                  randomizeNoteRespectingCalibration()
+            // Practice mode controls only (New Note button is now in clef HStack above)
+            HStack(spacing: 12) {
+              Text("Practice")
+              HStack(spacing: 8) {
+                Text("Count:")
+                Text("\(practiceCount)")
+                  .monospaced()
+                
+                HStack(spacing: 6) {
+                  Button {
+                    practiceCount = max(5, practiceCount - 5)
+                  } label: {
+                    Image(systemName: "chevron.down")
+                      .font(.system(size: 12, weight: .semibold))
+                      .foregroundStyle(.white)
+                      .padding(6)
+                      .background(Color.white.opacity(0.12))
+                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                  }
+                  .buttonStyle(.plain)
+                  
+                  Button {
+                    practiceCount = min(100, practiceCount + 5)
+                  } label: {
+                    Image(systemName: "chevron.up")
+                      .font(.system(size: 12, weight: .semibold))
+                      .foregroundStyle(.white)
+                      .padding(6)
+                      .background(Color.white.opacity(0.12))
+                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                  }
+                  .buttonStyle(.plain)
                 }
+              }
+              .foregroundStyle(.white)
+              
+              Button("Start Practice") {
+                startPractice()
               }
               .buttonStyle(.borderedProminent)
               .tint(.white)
               .foregroundStyle(.black)
               .controlSize(.regular)
-              
-              // Practice mode controls
-              HStack(spacing: 12) {
-                Text("Practice")
-                HStack(spacing: 8) {
-                  Text("Count:")
-                  Text("\(practiceCount)")
-                    .monospaced()
-                  
-                  HStack(spacing: 6) {
-                    Button {
-                      practiceCount = max(5, practiceCount - 5)
-                    } label: {
-                      Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(6)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                      practiceCount = min(100, practiceCount + 5)
-                    } label: {
-                      Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(6)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                  }
-                }
-                .foregroundStyle(.white)
-                
-                Button("Start Practice") {
-                  startPractice()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.white)
-                .foregroundStyle(.black)
-                .controlSize(.regular)
-              }
             }
             .foregroundStyle(.white)
             .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
             .frame(height: 56)
             #if os(iOS)
-            .padding(.bottom, 5) // Balanced space between practice controls and keyboard on iPad
+            .padding(.bottom, 0) // Remove bottom padding to give more room for keyboard spacing
             #endif
           }
           
@@ -975,7 +974,7 @@ struct ContentView: View {
     #if os(macOS)
     .padding([.top, .horizontal], 20) // Mac padding
     #else
-    .padding([.top, .horizontal], 70) // iPad padding - balanced for visibility
+    .padding([.top, .horizontal], 100) // iPad padding - balanced for visibility
     .padding(.top, 8) // Extra top padding on iPad to prevent top clipping
     #endif
     //.ignoresSafeArea(edges: .all)
