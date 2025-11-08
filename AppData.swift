@@ -35,10 +35,10 @@ final class AppData: ObservableObject {
         return range.count
     }
 
-    /// Reset calibration to defaults (full MIDI range)
+    /// Reset calibration to defaults (61-key range: C2 to C7)
     func clearCalibration() {
-        minMIDINote = 0
-        maxMIDINote = 127
+        minMIDINote = 36  // C2
+        maxMIDINote = 96  // C7 (61 keys total)
     }
 
     @Published var noteHeadStyle: NoteHeadStyle {
@@ -64,11 +64,12 @@ final class AppData: ObservableObject {
         self.noteHeadStyle = NoteHeadStyle(rawValue: raw) ?? .whole
         self.includeAccidentals = UserDefaults.standard.object(forKey: Self.includeAccidentalsKey) as? Bool ?? false
 
-        // Calibration defaults: full MIDI range unless previously set
+        // Calibration defaults: 61-key range (C2 to C7) unless previously set
+        // This matches a standard 61-key keyboard with proper sound mapping
         let savedMin = UserDefaults.standard.object(forKey: Self.minMIDINoteKey) as? Int
         let savedMax = UserDefaults.standard.object(forKey: Self.maxMIDINoteKey) as? Int
-        self.minMIDINote = savedMin ?? 0
-        self.maxMIDINote = savedMax ?? 127
+        self.minMIDINote = savedMin ?? 36  // C2
+        self.maxMIDINote = savedMax ?? 96  // C7 (61 keys total)
     }
 }
 
