@@ -879,7 +879,7 @@ struct ContentView: View {
   var midiReceivedIndicator: some View {
     HStack(alignment: .center) {
       // Left-aligned MIDI In indicator
-      HStack(spacing: 15) {
+      HStack(spacing: 10) {
         Text("MIDI In")
           .fontWeight(.semibold)
         Circle()
@@ -888,10 +888,10 @@ struct ContentView: View {
           .frame(maxWidth: 20, maxHeight: 20)
       }
       
-      Spacer()
+      //Spacer()
       
       // Centered Note style picker (custom segmented control)
-      HStack(spacing: 8) {
+      HStack(spacing: 25) {
         Text("Note Type:")
           .font(.callout)
           .fontWeight(.semibold)
@@ -960,7 +960,8 @@ struct ContentView: View {
         .controlSize(.regular)
       }
     }
-    .padding([.top, .horizontal], 20)
+    .padding([.top, .horizontal], 70)
+    //.ignoresSafeArea(edges: .all)
     .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
     .foregroundStyle(.white)
