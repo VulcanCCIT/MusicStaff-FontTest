@@ -871,13 +871,14 @@ struct Keyboard3DView: View {
         context.stroke(keyRight, with: .color(Color.black.opacity(0.10)), lineWidth: 0.3)
 
         // Note: front faces are guaranteed visible by depth clamp above
-        // Label (only C's)
+        // Label (only C's) - positioned fully above the shadow line with fixed offset
         let pitch = Pitch(intValue: midi)
         let label = scientificLabel(pitch)
         if !label.isEmpty {
-            let labelPoint = CGPoint(x: xL + width/2, y: keyEndY - 16)
+            // Position 6 points above the top edge to clear the shadow line
+            let labelPoint = CGPoint(x: xL + width/2, y: keyEndY - 6)
             let labelText = Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Color.secondary)
             context.draw(labelText, at: labelPoint)
         }
