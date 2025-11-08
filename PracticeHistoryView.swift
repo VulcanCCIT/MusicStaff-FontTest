@@ -12,6 +12,7 @@ struct PracticeHistoryView: View {
     @State private var showingDeleteAlert = false
     @State private var sessionToDelete: PracticeSession?
     @State private var showingStatistics = false
+    @State private var selectedSession: PracticeSession?
     
     var body: some View {
         NavigationSplitView {
@@ -41,49 +42,39 @@ struct PracticeHistoryView: View {
             .onChange(of: isLoading) { oldValue, newValue in
                 print("🔍 Loading changed from \(oldValue) to \(newValue)")
             }
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        navigationPath.removeLast()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink("Statistics") {
-                        PracticeStatisticsView()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                #else
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        navigationPath.removeLast()
-                    }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Statistics") {
-                        showingStatistics = true
-                    }
-                    .buttonStyle(.bordered)
-                }
-                #endif
-            }
         } detail: {
-            // Default detail view for when no session is selected
-            VStack {
-                Image(systemName: "music.note.list")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.secondary)
-                
-                Text("Select a Practice Session")
-                    .font(.title2.bold())
-                
-                Text("Click on a session from the list to view detailed results.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+            // Show selected session detail or placeholder
+            if let session = selectedSession {
+                PracticeSessionDetailView(session: session)
+            } else {
+                VStack {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 60))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("Select a Practice Session")
+                        .font(.title2.bold())
+                    
+                    Text("Click on a session from the list to view detailed results.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Done") {
+                    navigationPath.removeLast()
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Statistics") {
+                    showingStatistics = true
+                }
+                .buttonStyle(.bordered)
+            }
         }
         .alert("Delete Session", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -166,9 +157,11 @@ struct PracticeHistoryView: View {
             .padding(.vertical, 8)
             .background(.quaternary)
             
-            List {
+            List(selection: $selectedSession) {
                 ForEach(sessions) { session in
-                    NavigationLink(destination: PracticeSessionDetailView(session: session)) {
+                    Button {
+                        selectedSession = session
+                    } label: {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -220,7 +213,10 @@ struct PracticeHistoryView: View {
                             .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .tag(session)
                 }
                 .onDelete(perform: deleteSessions)
             }
@@ -280,6 +276,11 @@ struct PracticeHistoryView: View {
             do {
                 guard let dataService = practiceDataService else { return }
                 try dataService.deleteSession(session)
+                
+                // Clear selected session if it's the one being deleted
+                if selectedSession?.id == session.id {
+                    selectedSession = nil
+                }
                 
                 sessions.removeAll { $0.id == session.id }
                 sessionToDelete = nil
@@ -403,8 +404,8 @@ struct PracticeSessionDetailView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        List {
+            Section {
                 // Session header
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Practice Session Details")
@@ -418,6 +419,8 @@ struct PracticeSessionDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
                 
                 // Session statistics
                 VStack(alignment: .leading, spacing: 8) {
@@ -451,19 +454,29 @@ struct PracticeSessionDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                
-                Divider()
-                
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
+                .listRowBackground(Color.clear)
+            }
+            
+            Section {
                 // Header for detailed results
-                Text("Note-by-Note Results")
-                    .font(.title2.bold())
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Note-by-Note Results")
+                        .font(.title2.bold())
+                    
+                    Text("Shows each note you practiced with clef information and attempt details:")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
+                .listRowBackground(Color.clear)
                 
-                Text("Shows each note you practiced with clef information and attempt details:")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                // Show the same detailed results as PracticeResultsView
-                LazyVStack(spacing: 8) {
+                if groupedResults.isEmpty {
+                    Text("No detailed results available for this session.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+                } else {
                     ForEach(Array(groupedResults.enumerated()), id: \.offset) { index, result in
                         PracticeNoteResultRow(
                             noteNumber: index + 1,
@@ -471,21 +484,13 @@ struct PracticeSessionDetailView: View {
                             attempts: result.attempts,
                             firstTryCorrect: result.firstTryCorrect
                         )
-                        .padding(.horizontal, 8)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        .listRowBackground(Color.clear)
                     }
                 }
-                .padding(.vertical, 8)
-                
-                if groupedResults.isEmpty {
-                    Text("No detailed results available for this session.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding()
-                }
             }
-            .padding()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .listStyle(.plain)
         .onAppear {
             print("🔍 Session detail view appeared for session with \(session.attempts.count) attempts")
             print("🔍 Grouped into \(groupedResults.count) unique notes")
