@@ -282,11 +282,21 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     func simulateNoteOn(noteNumber: Int, velocity: Int, channel: Int = 0) {
         // Trigger audio immediately and emit payload
         instrument.play(noteNumber: MIDINoteNumber(noteNumber), velocity: MIDIVelocity(velocity), channel: 0)
-        DispatchQueue.main.async {
-            self.noteOnSubject.send((noteNumber, velocity))
-        }
+        
+        // Send subject notification immediately (doesn't trigger @Published)
+        noteOnSubject.send((noteNumber, velocity))
 
+        // Batch state updates to reduce view churn
         DispatchQueue.main.async {
+            // Only update active notes (minimal state change)
+            if velocity > 0 {
+                self.activeNotes.insert(noteNumber)
+            } else {
+                self.activeNotes.remove(noteNumber)
+            }
+            
+            // Only update these properties if they're actually being displayed
+            // (i.e., not during rapid note dragging)
             self.lastEventWasSimulated = true
             self.noteOnEventID = UUID()
             self.midiEventType = .noteOn
@@ -294,11 +304,8 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             self.data.noteOn = noteNumber
             self.data.velocity = velocity
             self.data.channel = channel
-            if velocity > 0 {
-                self.activeNotes.insert(noteNumber)
-            } else {
-                // Treat Note On with velocity 0 as Note Off
-                self.activeNotes.remove(noteNumber)
+            
+            if velocity == 0 {
                 withAnimation(.easeOut(duration: 0.4)) {
                     self.isShowingMIDIReceived = false
                 }
@@ -309,18 +316,22 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     func simulateNoteOff(noteNumber: Int, velocity: Int = 0, channel: Int = 0) {
         // Trigger audio immediately and emit payload
         instrument.stop(noteNumber: MIDINoteNumber(noteNumber), channel: 0)
-        DispatchQueue.main.async {
-            self.noteOffSubject.send(noteNumber)
-        }
+        
+        // Send subject notification immediately (doesn't trigger @Published)
+        noteOffSubject.send(noteNumber)
 
+        // Batch state updates to reduce view churn
         DispatchQueue.main.async {
+            // Only update active notes (minimal state change)
+            self.activeNotes.remove(noteNumber)
+            
+            // Only update these properties if needed for display
             self.lastEventWasSimulated = true
             self.midiEventType = .noteOff
             self.isShowingMIDIReceived = false
             self.data.noteOff = noteNumber
             self.data.velocity = velocity
             self.data.channel = channel
-            self.activeNotes.remove(noteNumber)
         }
     }
 }

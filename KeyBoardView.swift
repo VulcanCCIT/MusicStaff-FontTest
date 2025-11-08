@@ -47,7 +47,6 @@ struct KeyBoardView: View {
   @State private var externalVelocities: [Int: Double] = [:] // midiNote -> 0.0...1.0
   
   @State private var pressedCorrectness: [Int: Bool] = [:] // midi -> was-correct at noteOn
-  @AppStorage("keyboardIs3DMode") private var is3DMode: Bool = false
   
   @State var scaleIndex = Scale.allCases.firstIndex(of: .chromatic) ?? 0 {
     didSet {
@@ -93,38 +92,12 @@ struct KeyBoardView: View {
     HStack {
       VStack {
         
-        // Full-width control panel above the keyboard (knobs, meter, and 3D toggle on one line)
+        // Full-width control panel above the keyboard (knobs and meter)
         ZStack {
           HStack(alignment: .center, spacing: 24) {
             KnobImage()
             KnobImage()
             Spacer()
-            
-            // 3D Toggle Button - Enhanced visibility
-            Button(action: {
-              withAnimation(.easeInOut(duration: 0.3)) {
-                is3DMode.toggle()
-              }
-            }) {
-              HStack(spacing: 8) {
-                Image(systemName: is3DMode ? "cube.fill" : "rectangle.fill")
-                  .font(.system(size: 18, weight: .semibold))
-                Text(is3DMode ? "3D" : "2D")
-                  .font(.system(size: 16, weight: .semibold))
-              }
-              .foregroundColor(.white)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 10)
-              .background(
-                RoundedRectangle(cornerRadius: 10)
-                  .fill(is3DMode ? 
-                        LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing) :
-                        LinearGradient(colors: [.gray, .secondary], startPoint: .leading, endPoint: .trailing)
-                  )
-                  .shadow(color: is3DMode ? .blue.opacity(0.4) : .gray.opacity(0.3), radius: 4)
-              )
-            }
-            .buttonStyle(.plain)
             
             ZStack(alignment: .topTrailing) {
               KnobImage()
@@ -156,173 +129,79 @@ struct KeyBoardView: View {
         .padding(.bottom, 8) // Add gap between control panel and piano rail
         
         // Piano rail separator tying panel and keyboard together
-        PianoRail(is3D: is3DMode)
+        PianoRail()
           .frame(height: 14)
           .padding(.horizontal, 22)
           .padding(.top, -8)
           .padding(.bottom, 8)
 
-        // Keyboard View (2D or 3D)
+        // 3D Keyboard View
         GeometryReader { proxy in
           let whiteCount = max(1, (lowNote...highNote).filter { ![1,3,6,8,10].contains($0 % 12) }.count)
           let keyWidth = proxy.size.width / CGFloat(whiteCount)
-          let lengthFactor: CGFloat = is3DMode ? 5.6 : 3.4
+          let lengthFactor: CGFloat = 5.6
           let idealHeight = keyWidth * lengthFactor
           
           // Platform-specific and docked-mode-aware height calculation
           #if os(macOS)
-          let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...350) : idealHeight.clamped(to: 170...320)
+          let responsiveHeight = idealHeight.clamped(to: 170...350)
           #else
           // iPad needs much smaller keyboard when docked to avoid clipping
           let dockedScaleFactor: CGFloat = docked ? 0.65 : 1.0 // 35% smaller when docked
           let scaledIdealHeight = idealHeight * dockedScaleFactor
-          let responsiveHeight = is3DMode ? scaledIdealHeight.clamped(to: 120...180) : scaledIdealHeight.clamped(to: 120...160)
+          let responsiveHeight = scaledIdealHeight.clamped(to: 120...180)
           #endif
-          let chassisCorner3D: CGFloat = {
-              // Map height 170...320 -> radius 32...18 (clamped)
-              let minH: CGFloat = 170
-              let maxH: CGFloat = 320
-              let minR: CGFloat = 32
-              let maxR: CGFloat = 18
-              let t = ((responsiveHeight - minH) / (maxH - minH)).clamped(to: 0...1)
-              return (minR + (maxR - minR) * t).clamped(to: 18...32)
-          }()
           
-          if is3DMode {
-            ZStack {
-              Keyboard3DView(
-                lowNote: lowNote,
-                highNote: highNote,
-                conductor: conductor,
-                isCorrect: isCorrect,
-                pressedCorrectness: $pressedCorrectness,
-                externalVelocities: $externalVelocities,
-                scientificLabel: scientificLabel
-              )
-              .frame(height: responsiveHeight)
-            }
-            .padding(.horizontal, 8) // thinner left/right bezel to match 2D
-            .padding(.bottom, 10)
-            .background(
-              // Add the same styled background as 2D mode
-              ZStack {
-                // Unified chassis color to match the top panel
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(Color("MeterPanelColor"))
-
-                // Subtle vertical sheen similar to Panel3DBackground
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
-                  .blendMode(.softLight)
-
-                // Add subtle purple tint to match design language (reduced intensity) 
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
-                  .blendMode(.plusLighter)
-              }
+          ZStack {
+            Keyboard3DView(
+              lowNote: lowNote,
+              highNote: highNote,
+              conductor: conductor,
+              isCorrect: isCorrect,
+              pressedCorrectness: $pressedCorrectness,
+              externalVelocities: $externalVelocities,
+              scientificLabel: scientificLabel
             )
-            .overlay(
-              // Edge highlight
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-                .blendMode(.overlay)
-            )
-            .overlay(
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(
-                  LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing),
-                  lineWidth: 1
-                )
-                .blendMode(.screen)
-                .opacity(0.9)
-            )
-            .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
             .frame(height: responsiveHeight)
-          } else {
-            ZStack {
-              // Dark keybed background constrained to keyboard height
-              KeybedBackground()
-                .frame(height: responsiveHeight)
-                .clipped()
-
-              Keyboard(
-                layout: .piano(pitchRange: Pitch(intValue: lowNote) ... Pitch(intValue: highNote)),
-                noteOn: { pitch, point in
-                  // Map vertical position to MIDI velocity and notify conductor (audio is triggered in conductor)
-                  let raw = Int(point.y * 127)
-                  let vel = max(1, min(127, raw))
-                  conductor.simulateNoteOn(noteNumber: pitch.intValue, velocity: vel)
-                },
-                noteOff: { pitch in
-                  // Notify conductor of note off (audio is triggered in conductor)
-                  conductor.simulateNoteOff(noteNumber: pitch.intValue)
-                }
-              ) { pitch, isActivated in
-                let midi = pitch.intValue
-                let externallyOn = conductor.activeNotes.contains(midi)
-                ZStack {
-                  let midi = pitch.intValue
-                  // Persist correctness from note-on until note-off so color doesn't flip while held
-                  let persisted: Bool? = pressedCorrectness[midi]
-                  let isActive = isActivated || externallyOn
-                  let effectiveCorrect: Bool = {
-                    if isActive, let persisted {
-                      return persisted
-                    } else {
-                      return isCorrect(midi)
-                    }
-                  }()
-                  let color: Color = effectiveCorrect ? .green : .red
-                  
-                  KeyboardKey(
-                    pitch: pitch,
-                    isActivated: isActivated || externallyOn,
-                    text: scientificLabel(for: pitch),
-                    pressedColor: color,
-                    alignment: .bottom
-                  )
-                }
-              }
-            }
-            .padding(.horizontal, 8) // thinner left/right bezel
-            .padding(.bottom, 10)
-            .background(
-              ZStack {
-                // Unified chassis color to match the top panel
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(Color("MeterPanelColor"))
-
-                // Subtle vertical sheen similar to Panel3DBackground
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
-                  .blendMode(.softLight)
-
-                // Add subtle purple tint to match design language (reduced intensity)
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                  .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
-                  .blendMode(.plusLighter)
-              }
-            )
-            .overlay(
-              // Edge highlight
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-                .blendMode(.overlay)
-            )
-            .overlay(
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(
-                  LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing),
-                  lineWidth: 1
-                )
-                .blendMode(.screen)
-                .opacity(0.9)
-            )
-            .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
-            .frame(height: responsiveHeight + 18)
           }
+          .padding(.horizontal, 8) // thinner left/right bezel
+          .padding(.bottom, 10)
+          .background(
+            // Add the same styled background
+            ZStack {
+              // Unified chassis color to match the top panel
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color("MeterPanelColor"))
+
+              // Subtle vertical sheen similar to Panel3DBackground
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
+                .blendMode(.softLight)
+
+              // Add subtle purple tint to match design language (reduced intensity) 
+              RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .blendMode(.plusLighter)
+            }
+          )
+          .overlay(
+            // Edge highlight
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+              .blendMode(.overlay)
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .stroke(
+                LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                lineWidth: 1
+              )
+              .blendMode(.screen)
+              .opacity(0.9)
+          )
+          .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
+          .frame(height: responsiveHeight)
         }
         #if os(macOS)
         .frame(minHeight: 170)
@@ -330,10 +209,10 @@ struct KeyBoardView: View {
         .frame(minHeight: docked ? 120 : 140, maxHeight: docked ? 180 : 220) // Much smaller when docked on iPad
         #endif
         #if os(macOS)
-        .padding(.bottom, docked ? 0 : (is3DMode ? 40 : 28))
+        .padding(.bottom, docked ? 0 : 40)
         #else
-        // 2D mode needs MORE bottom padding than 3D due to flat rendering showing labels lower
-        .padding(.bottom, docked ? (is3DMode ? 38 : 42) : (is3DMode ? 40 : 28))
+        // iPad bottom padding for comfortable spacing
+        .padding(.bottom, docked ? 38 : 40)
         #endif
       }
       .background(
@@ -371,7 +250,6 @@ struct KeyBoardView: View {
           externalVelocities.removeValue(forKey: note)
           pressedCorrectness.removeValue(forKey: note)
       }
-    }
 //    .background(
 //      // Sophisticated background gradient behind everything
 //      LinearGradient(
@@ -385,6 +263,7 @@ struct KeyBoardView: View {
 //      )
 //      .ignoresSafeArea(.all) // Fill entire canvas
 //    )
+    }
   }
 }
 
@@ -536,7 +415,6 @@ struct GlassReflection: View {
 }
 
 struct PianoRail: View {
-    var is3D: Bool = false
     var body: some View {
       ZStack {
         // Base glossy black rail
@@ -555,8 +433,8 @@ struct PianoRail: View {
       }
       .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
       .background(
-        ChromeStanchions(upLength: is3D ? 16 : 16, downLength: is3D ? 24 : 22, barWidth: 8, spacing: 54)
-          .padding(.vertical, is3D ? -20 : -19) // let bars extend above and below the rail
+        ChromeStanchions(upLength: 16, downLength: 24, barWidth: 8, spacing: 54)
+          .padding(.vertical, -20) // let bars extend above and below the rail
       )
     }
   }
@@ -610,17 +488,6 @@ struct ChromeStanchions: View {
         .allowsHitTesting(false)
     }
 }
-
-  struct KeybedBackground: View {
-    var body: some View {
-      GeometryReader { size in
-        ZStack {
-          // Very subtle background - almost transparent
-          Color.clear
-        }
-      }
-    }
-  }
 
 //#Preview {
 //  let data = AppData()
@@ -1304,6 +1171,7 @@ struct Keyboard3DView: View {
     }
 }
 
+// MARK: - Comparable Extension
 extension Comparable {
   func clamped(to range: ClosedRange<Self>) -> Self {
     return min(max(self, range.lowerBound), range.upperBound)
