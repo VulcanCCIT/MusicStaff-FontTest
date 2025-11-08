@@ -168,7 +168,16 @@ struct KeyBoardView: View {
           let keyWidth = proxy.size.width / CGFloat(whiteCount)
           let lengthFactor: CGFloat = is3DMode ? 5.6 : 3.4
           let idealHeight = keyWidth * lengthFactor
+          
+          // Platform-specific and docked-mode-aware height calculation
+          #if os(macOS)
           let responsiveHeight = is3DMode ? idealHeight.clamped(to: 170...350) : idealHeight.clamped(to: 170...320)
+          #else
+          // iPad needs much smaller keyboard when docked to avoid clipping
+          let dockedScaleFactor: CGFloat = docked ? 0.65 : 1.0 // 35% smaller when docked
+          let scaledIdealHeight = idealHeight * dockedScaleFactor
+          let responsiveHeight = is3DMode ? scaledIdealHeight.clamped(to: 120...180) : scaledIdealHeight.clamped(to: 120...160)
+          #endif
           let chassisCorner3D: CGFloat = {
               // Map height 170...320 -> radius 32...18 (clamped)
               let minH: CGFloat = 170
@@ -315,8 +324,17 @@ struct KeyBoardView: View {
             .frame(height: responsiveHeight + 18)
           }
         }
+        #if os(macOS)
         .frame(minHeight: 170)
+        #else
+        .frame(minHeight: docked ? 120 : 140, maxHeight: docked ? 180 : 220) // Much smaller when docked on iPad
+        #endif
+        #if os(macOS)
         .padding(.bottom, docked ? 0 : (is3DMode ? 40 : 28))
+        #else
+        // 3D mode needs slightly more bottom padding due to perspective rendering
+        .padding(.bottom, docked ? (is3DMode ? 38 : 35) : (is3DMode ? 40 : 28))
+        #endif
       }
       .background(
         docked ? Color.clear : (colorScheme == .dark ? Color.clear : Color("MeterPanelColor"))
@@ -328,6 +346,10 @@ struct KeyBoardView: View {
                   .frame(height: 1)
           }
       }
+      #if os(iOS)
+      // Critical: Add safe area padding at the bottom on iPad to prevent clipping
+      .safeAreaPadding(.bottom, docked ? 24 : 0) // Slightly increased for better label visibility
+      #endif
       .clipShape(
         UnevenRoundedRectangle(
           topLeadingRadius: 18,
@@ -736,8 +758,12 @@ struct Keyboard3DView: View {
         let elevation = blackKeyElevation * s
         // Shadow variables removed - no longer needed
 
-        // Inserted bottom margin constant
-        let bottomMargin = max(16, whiteFrontH * 1.25) // larger reserve so front faces never clip
+        // Inserted bottom margin constant - platform specific to prevent clipping
+        #if os(macOS)
+        let bottomMargin = max(16, whiteFrontH * 1.25) // Mac reserve
+        #else
+        let bottomMargin = max(32, whiteFrontH * 1.5) // iPad needs more reserve to prevent clipping
+        #endif
 
         // Enhanced perspective for "sitting at keyboard" viewing angle
         // Show more depth while still guaranteeing the white-key front faces are visible
@@ -1185,8 +1211,12 @@ struct Keyboard3DView: View {
         let a: CGFloat = 0.20 / 0.72
         let whiteFrontH = whiteFrontHeight * scaleFor(size: size)
 
-        // Inserted bottom margin constant
-        let bottomMargin = max(16, whiteFrontH * 1.25)
+        // Inserted bottom margin constant - platform specific
+        #if os(macOS)
+        let bottomMargin = max(16, whiteFrontH * 1.25) // Mac reserve
+        #else
+        let bottomMargin = max(32, whiteFrontH * 1.5) // iPad needs more reserve
+        #endif
 
         let preferredDepth = size.height // allow deeper keys; clamp below
         let maxDepthByHeight = max(60, (size.height - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))

@@ -591,7 +591,11 @@ struct ContentView: View {
         )
         
         // Existing content
-        VStack(spacing: 16) {
+        VStack(spacing: 12) { // Reduced from 16 to 12 to give more vertical room
+          #if os(iOS)
+          // Add breathing room at top on iPad to prevent clipping
+          Color.clear.frame(height: 8)
+          #endif
           midiReceivedIndicator
           // Spacer()
           
@@ -963,7 +967,8 @@ struct ContentView: View {
     #if os(macOS)
     .padding([.top, .horizontal], 20) // Mac padding
     #else
-    .padding([.top, .horizontal], 70) // iPad padding
+    .padding([.top, .horizontal], 70) // iPad padding - balanced for visibility
+    .padding(.top, 8) // Extra top padding on iPad to prevent top clipping
     #endif
     //.ignoresSafeArea(edges: .all)
     .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
