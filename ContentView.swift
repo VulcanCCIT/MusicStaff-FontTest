@@ -636,10 +636,16 @@ struct ContentView: View {
               let offsetX = centerX - noteX
               let offsetY = centerY - originalGroupMidY
               
-              // iPad-specific: scale down the staff to fit more vertical range within the same canvas height
+              // Platform-specific scaling to accommodate full 88-key range with note tails
               #if os(macOS)
-              context.translateBy(x: offsetX, y: offsetY)
+              // Mac: moderate scaling with increased canvas height
+              let scale: CGFloat = 0.78 // Scale down by 22% on Mac
+              let verticalShift: CGFloat = 15 // Shift staff down by 15 points for more top clearance
+              context.translateBy(x: centerX, y: centerY + verticalShift)
+              context.scaleBy(x: scale, y: scale)
+              context.translateBy(x: -noteX, y: -originalGroupMidY)
               #else
+              // iPad: more aggressive scaling due to limited space
               let scale: CGFloat = 0.70 // Scale down by 30% on iPad to accommodate full 88-key range
               let verticalShift: CGFloat = 10 // Shift staff down by 10 points to give more clearance at top
               context.translateBy(x: centerX, y: centerY + verticalShift)
@@ -719,7 +725,11 @@ struct ContentView: View {
               }
               context.draw(noteText, at: notePoint, anchor: .center)
             }
-            .frame(height: 280)
+            #if os(macOS)
+            .frame(height: 320) // Mac: increased from 280 to give more room for extreme notes
+            #else
+            .frame(height: 280) // iPad: keep at 280
+            #endif
             .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
             
