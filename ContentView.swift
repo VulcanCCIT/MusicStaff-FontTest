@@ -591,18 +591,16 @@ struct ContentView: View {
         )
         
         // Existing content
-        VStack(spacing: 12) { // Reduced from 16 to 12 to give more vertical room
-          #if os(iOS)
-          // Minimal breathing room at top on iPad to prevent clipping
-          Color.clear.frame(height: 4)
-          #endif
+        VStack(spacing: 0) {
           midiReceivedIndicator
-          // Spacer()
+          
+          Spacer()
+            .frame(height: 20)
           
           // Removed inline KeyBoardView here per instructions
           
           // Staff and note drawing (panel removed)
-          VStack(spacing: 12) {
+          VStack(spacing: 16) {
             Canvas { context, size in
               // Center the entire staff/note drawing within the canvas
               let centerX = size.width / 2
@@ -684,7 +682,7 @@ struct ContentView: View {
               }
               context.draw(noteText, at: notePoint, anchor: .center)
             }
-            .frame(height: 320)
+            .frame(height: 280)
             .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
             
@@ -727,7 +725,7 @@ struct ContentView: View {
                 .monospaced()
             }
           }
-          .padding(.horizontal)
+          .padding(.horizontal, 20)
           .foregroundStyle(.white)
           
           // Practice mode controls or free play button
@@ -797,12 +795,10 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
             .frame(height: 56)
-            #if os(iOS)
-            .padding(.bottom, 0) // Remove bottom padding to give more room for keyboard spacing
-            #endif
           }
           
           Spacer()
+            .frame(minHeight: 8, maxHeight: 20)
         } // VStack
         .safeAreaInset(edge: .bottom) {
           KeyBoardView(isCorrect: { midi in
@@ -811,6 +807,7 @@ struct ContentView: View {
           .environmentObject(appData)
           .environmentObject(conductor)
         }
+        .padding(.horizontal, 8)
         .onAppear {
           vm.setAllowedMIDIRange(appData.calibratedRange)
           vm.setIncludeAccidentals(appData.includeAccidentals)
@@ -865,7 +862,6 @@ struct ContentView: View {
         .onDisappear {
           conductor.stop()
         }
-        .padding()
         .navigationDestination(for: NavigationDestination.self) { destination in
           switch destination {
             case .calibration:
@@ -888,24 +884,27 @@ struct ContentView: View {
   } // body
   
   var midiReceivedIndicator: some View {
-    HStack(alignment: .center) {
+    HStack(alignment: .center, spacing: 16) {
       // Left-aligned MIDI In indicator
-      HStack(spacing: 10) {
+      HStack(spacing: 8) {
         Text("MIDI In")
+          .font(.callout)
           .fontWeight(.semibold)
+          .fixedSize()
         Circle()
           .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
           .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
-          .frame(maxWidth: 20, maxHeight: 20)
+          .frame(width: 20, height: 20)
       }
       
-      //Spacer()
+      Spacer()
       
       // Centered Note style picker (custom segmented control)
-      HStack(spacing: 25) {
+      HStack(spacing: 12) {
         Text("Note Type:")
           .font(.callout)
           .fontWeight(.semibold)
+          .fixedSize()
         HStack(spacing: 0) {
           ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
             let isSelected = appData.noteHeadStyle == style
@@ -942,17 +941,18 @@ struct ContentView: View {
         
         Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
           .controlSize(.small)
+          .fixedSize()
       }
       
       Spacer()
       
       // Right-aligned controls
-      HStack(spacing: 12) {
+      HStack(spacing: 10) {
         Text(calibrationDisplayText)
           .font(.subheadline)
           .foregroundColor(.white)
-        //.lineLimit(1)
-          .frame(width: 130)
+          .fixedSize()
+          .frame(minWidth: 120)
         
         Button("History") {
           navigationPath.append(NavigationDestination.history)
@@ -972,13 +972,12 @@ struct ContentView: View {
       }
     }
     #if os(macOS)
-    .padding([.top, .horizontal], 20) // Mac padding
+    .padding([.top, .horizontal], 20)
     #else
-    .padding([.top, .horizontal], 100) // iPad padding - balanced for visibility
-    .padding(.top, 8) // Extra top padding on iPad to prevent top clipping
+    .padding(.horizontal, 16)
+    .padding(.top, 90)
     #endif
-    //.ignoresSafeArea(edges: .all)
-    .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
+    .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
     .foregroundStyle(.white)
     .tint(.white.opacity(0.9))
