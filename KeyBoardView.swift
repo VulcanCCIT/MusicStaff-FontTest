@@ -160,7 +160,8 @@ struct KeyBoardView: View {
               isCorrect: isCorrect,
               pressedCorrectness: $pressedCorrectness,
               externalVelocities: $externalVelocities,
-              scientificLabel: scientificLabel
+              scientificLabel: scientificLabel,
+              showHints: appData.showHints
             )
             .frame(height: responsiveHeight)
           }
@@ -506,6 +507,7 @@ struct Keyboard3DView: View {
     @Binding var pressedCorrectness: [Int: Bool]
     @Binding var externalVelocities: [Int: Double]
     let scientificLabel: (Pitch) -> String
+    let showHints: Bool
     
     @Environment(\.colorScheme) var colorScheme
     @State private var keyPresses: Set<Int> = [] // active MIDI notes
@@ -874,7 +876,7 @@ struct Keyboard3DView: View {
         // Label (only C's) - positioned fully above the shadow line with fixed offset
         let pitch = Pitch(intValue: midi)
         let label = scientificLabel(pitch)
-        if !label.isEmpty {
+        if !label.isEmpty && showHints {
             // Position 6 points above the top edge to clear the shadow line
             let labelPoint = CGPoint(x: xL + width/2, y: keyEndY - 6)
             let labelText = Text(label)

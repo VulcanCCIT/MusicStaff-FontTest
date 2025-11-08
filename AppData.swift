@@ -57,12 +57,21 @@ final class AppData: ObservableObject {
 
     private static let includeAccidentalsKey = "includeAccidentals"
 
+    @Published var showHints: Bool {
+        didSet {
+            UserDefaults.standard.set(showHints, forKey: Self.showHintsKey)
+        }
+    }
+
+    private static let showHintsKey = "showHints"
+
     init() {
         // Note head style
         let raw = UserDefaults.standard.string(forKey: Self.noteHeadStyleKey)
             ?? NoteHeadStyle.whole.rawValue
         self.noteHeadStyle = NoteHeadStyle(rawValue: raw) ?? .whole
         self.includeAccidentals = UserDefaults.standard.object(forKey: Self.includeAccidentalsKey) as? Bool ?? false
+        self.showHints = UserDefaults.standard.object(forKey: Self.showHintsKey) as? Bool ?? true // Default to showing hints
 
         // Calibration defaults: 61-key range (C2 to C7) unless previously set
         // This matches a standard 61-key keyboard with proper sound mapping

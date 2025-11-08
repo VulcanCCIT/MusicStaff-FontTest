@@ -737,12 +737,15 @@ struct ContentView: View {
             HStack(spacing: 12) {
               Spacer()
               
-              Text("Clef:")
-              Text(vm.currentClef == .treble ? "Treble" : "Bass")
-              Text("Note:")
-              Text(vm.currentNote.name).monospaced()
-              Text("MIDI:")
-              Text(String(vm.currentNote.midi)).monospaced()
+              // Show hints only if enabled
+              if appData.showHints {
+                Text("Clef:")
+                Text(vm.currentClef == .treble ? "Treble" : "Bass")
+                Text("Note:")
+                Text(vm.currentNote.name).monospaced()
+                Text("MIDI:")
+                Text(String(vm.currentNote.midi)).monospaced()
+              }
               
               // New Note button centered with the text
               if !isPracticeMode {
@@ -927,103 +930,144 @@ struct ContentView: View {
   } // body
   
   var midiReceivedIndicator: some View {
-    HStack(alignment: .center, spacing: 16) {
-      // Left-aligned MIDI In indicator
-      HStack(spacing: 8) {
-        Text("MIDI In")
-          .font(.callout)
-          .fontWeight(.semibold)
-          .fixedSize()
-        Circle()
-          .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
-          .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
-          .frame(width: 20, height: 20)
-      }
-      
-      Spacer()
-      
-      // Centered Note style picker (custom segmented control)
-      HStack(spacing: 12) {
-        Text("Note Type:")
-          .font(.callout)
-          .fontWeight(.semibold)
-          .fixedSize()
-        HStack(spacing: 0) {
-          ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
-            let isSelected = appData.noteHeadStyle == style
-            Button(action: { appData.noteHeadStyle = style }) {
-              Text({
-                switch style {
-                  case .whole: return "Whole"
-                  case .half: return "Half"
-                  case .quarter: return "Quarter"
-                }
-              }())
+    VStack(spacing: 8) {
+      // Top row: MIDI In, Note Type, and Toggles
+      HStack(alignment: .center, spacing: Platform.menuBarSpacing) {
+        // Left-aligned MIDI In indicator
+        HStack(spacing: Platform.innerSpacing) {
+          Text("MIDI In")
+            .font(Platform.menuFont)
+            .fontWeight(.semibold)
+            .fixedSize()
+          Circle()
+            .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
+            .background(Circle().fill(conductor.isShowingMIDIReceived ? .blue : .blue.opacity(0.2)))
+            .frame(width: 16, height: 16)
+        }
+        
+        if Platform.isMac {
+          Spacer()
+        }
+        
+        // Note style picker (custom segmented control)
+        HStack(spacing: Platform.innerSpacing) {
+          if Platform.isMac {
+            Text("Note Type:")
               .font(.callout)
-              .fontWeight(.medium)
-              .frame(width: 200/3, height: 28)
-              .contentShape(Rectangle())
-              .foregroundColor(isSelected ? .black : .white.opacity(0.7))
-              .background(
-                Group {
-                  if isSelected {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                      .fill(.white)
-                  } else {
-                    Color.clear
-                  }
-                }
-              )
-            }
-            .buttonStyle(.plain)
+              .fontWeight(.semibold)
+              .fixedSize()
           }
+          HStack(spacing: 0) {
+            ForEach([NoteHeadStyle.whole, .half, .quarter], id: \.self) { style in
+              let isSelected = appData.noteHeadStyle == style
+              Button(action: { appData.noteHeadStyle = style }) {
+                Text({
+                  switch style {
+                    case .whole: return "Whole"
+                    case .half: return "Half"
+                    case .quarter: return "Quarter"
+                  }
+                }())
+                .font(Platform.buttonFont)
+                .frame(width: Platform.buttonWidth, height: Platform.buttonHeight)
+                .fontWeight(.medium)
+                .contentShape(Rectangle())
+                .foregroundColor(isSelected ? .black : .white.opacity(0.7))
+                .background(
+                  Group {
+                    if isSelected {
+                      RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(.white)
+                    } else {
+                      Color.clear
+                    }
+                  }
+                )
+              }
+              .buttonStyle(.plain)
+            }
+          }
+          .padding(3)
+          .background(Color.white.opacity(0.15))
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          
+          Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
+            .controlSize(Platform.toggleSize)
+            .fixedSize()
+          
+          Toggle("Show Hints", isOn: $appData.showHints)
+            .controlSize(Platform.toggleSize)
+            .fixedSize()
         }
-        .padding(3)
-        .background(Color.white.opacity(0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         
-        Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
-          .controlSize(.small)
-          .fixedSize()
-      }
-      
-      Spacer()
-      
-      // Right-aligned controls
-      HStack(spacing: 10) {
-        Text(calibrationDisplayText)
-          .font(.subheadline)
-          .foregroundColor(.white)
-          .fixedSize()
-          .frame(minWidth: 120)
-        
-        Button("History") {
-          navigationPath.append(NavigationDestination.history)
+        if Platform.isMac {
+          Spacer()
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.white)
-        .foregroundStyle(.black)
-        .controlSize(.regular)
         
-        Button("Calibrate") {
-          navigationPath.append(NavigationDestination.calibration)
+        // Right-aligned controls
+        HStack(spacing: 8) {
+          Text(calibrationDisplayText)
+            .font(Platform.calibrationFont)
+            .foregroundColor(.white)
+            .fixedSize()
+            .lineLimit(1)
+            .frame(minWidth: Platform.calibrationWidth)
+          
+          Button("History") {
+            navigationPath.append(NavigationDestination.history)
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.white)
+          .foregroundStyle(.black)
+          .controlSize(Platform.buttonControlSize)
+          
+          Button("Calibrate") {
+            navigationPath.append(NavigationDestination.calibration)
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.white)
+          .foregroundStyle(.black)
+          .controlSize(Platform.buttonControlSize)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.white)
-        .foregroundStyle(.black)
-        .controlSize(.regular)
       }
     }
-    #if os(macOS)
-    .padding([.top, .horizontal], 20)
-    #else
-    .padding(.horizontal, 16)
-    .padding(.top, 90)
-    #endif
+    .padding(.top, Platform.isMac ? 16 : 90)
+    .padding(.horizontal, Platform.horizontalPadding)
     .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
     .foregroundStyle(.white)
     .tint(.white.opacity(0.9))
+  }
+  
+  // Helper struct for platform-specific values
+  private struct Platform {
+    #if os(macOS)
+    static let isMac = true
+    static let menuBarSpacing: CGFloat = 12
+    static let innerSpacing: CGFloat = 6
+    static let menuFont: Font = .callout
+    static let buttonFont: Font = .callout
+    static let buttonWidth: CGFloat = 190/3
+    static let buttonHeight: CGFloat = 28
+    static let toggleSize: ControlSize = .small
+    static let calibrationFont: Font = .caption
+    static let calibrationWidth: CGFloat = 80
+    static let buttonControlSize: ControlSize = .small
+    static let horizontalPadding: CGFloat = 16
+    #else
+    static let isMac = false
+    static let menuBarSpacing: CGFloat = 10
+    static let innerSpacing: CGFloat = 8
+    static let menuFont: Font = .caption
+    static let buttonFont: Font = .caption2
+    static let buttonWidth: CGFloat = 140/3
+    static let buttonHeight: CGFloat = 24
+    static let toggleSize: ControlSize = .mini
+    static let calibrationFont: Font = .caption2
+    static let calibrationWidth: CGFloat = 60
+    static let buttonControlSize: ControlSize = .mini
+    static let horizontalPadding: CGFloat = 8
+    #endif
   }
 } // ContentView
   
