@@ -960,7 +960,11 @@ struct ContentView: View {
         .controlSize(.regular)
       }
     }
-    .padding([.top, .horizontal], 70)
+    #if os(macOS)
+    .padding([.top, .horizontal], 20) // Mac padding
+    #else
+    .padding([.top, .horizontal], 70) // iPad padding
+    #endif
     //.ignoresSafeArea(edges: .all)
     .frame(maxWidth: .infinity, maxHeight: 60, alignment: .center)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
