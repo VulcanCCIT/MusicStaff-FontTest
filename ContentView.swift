@@ -733,7 +733,12 @@ struct ContentView: View {
             .foregroundStyle(.white)
             .frame(height: 56)
           } else {
-            VStack(spacing: 12) {
+            VStack(spacing: 6) { // Reduced from 12 to make room for spacers
+              #if os(iOS)
+              // Small spacer above for breathing room on iPad
+              Spacer().frame(height: 8)
+              #endif
+              
               // Free play button
               Button("New Note") {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1)) {

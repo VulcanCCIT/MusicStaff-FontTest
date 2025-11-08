@@ -403,8 +403,8 @@ struct KnobImage: View {
           .foregroundStyle(.white)
       }
       #else
-      if UIImage(named: "knob2") != nil {
-        Image("knob2")
+      if UIImage(named: "Knob2") != nil {
+        Image("Knob2")
           .resizable()
           .interpolation(.high)
           .antialiased(true)
