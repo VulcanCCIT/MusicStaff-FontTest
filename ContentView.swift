@@ -633,8 +633,6 @@ struct ContentView: View {
               let centerX = size.width / 2
               let centerY = size.height / 2
               let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
-              let offsetX = centerX - noteX
-              let offsetY = centerY - originalGroupMidY
               
               // Platform-specific scaling to accommodate full 88-key range with note tails
               #if os(macOS)

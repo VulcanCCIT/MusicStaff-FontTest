@@ -169,7 +169,7 @@ struct PracticeResultsView: View {
         Task {
             do {
                 let dataService = PracticeDataService(modelContext: modelContext)
-                try await dataService.savePracticeSession(
+                try dataService.savePracticeSession(
                     startDate: sessionStartDate,
                     endDate: Date(),
                     settings: settings,
@@ -832,7 +832,7 @@ struct PracticeNoteResultRow: View {
             let playedSymbol = MusicSymbol.quarterNoteUP.text()
             
             // Use the VM to determine the proper accidental
-            let (displayName, accidental) = displayNameAndAccidental(for: incorrectAttempt.playedMidi)
+            let (_, accidental) = displayNameAndAccidental(for: incorrectAttempt.playedMidi)
             
             if shouldDebug {
                 print("DEBUG: Note \(noteName(from: incorrectAttempt.playedMidi)) has accidental: '\(accidental)'")

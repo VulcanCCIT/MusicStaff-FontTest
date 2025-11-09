@@ -363,7 +363,7 @@ struct Panel3DBackground: View {
             )
 
             // Inner shadow along the lower-right edge
-            var innerEdge = trapezoid
+            let innerEdge = trapezoid
             context.stroke(innerEdge, with: .color(Color.black.opacity(0.16)), lineWidth: 2)
           }
         }
@@ -661,12 +661,6 @@ struct Keyboard3DView: View {
         whiteKeyArea.addLine(to: CGPoint(x: backLeftX, y: backLeftY))
         whiteKeyArea.closeSubpath()
         
-        // Use a gradient that suggests perspective depth
-        let perspectiveGradient: GraphicsContext.Shading = .linearGradient(
-            Gradient(colors: [Color.white.opacity(0.95), Color.white, Color.white.opacity(0.95)]),
-            startPoint: CGPoint(x: 0, y: keyboardY + keyboardDepth),
-            endPoint: CGPoint(x: totalWidth, y: keyboardY + keyboardDepth)
-        )
         // Add perspective shadow overlay to enhance depth illusion
         var shadowOverlay = Path()
         shadowOverlay.move(to: CGPoint(x: 0, y: keyboardY + keyboardDepth))
@@ -794,11 +788,6 @@ struct Keyboard3DView: View {
             if isPressed, let persisted { return persisted } else { return isCorrect(midi) }
         }()
 
-        // Base colors
-        let baseWhiteTop = Color(white: 0.98)
-        let baseWhiteFront = Color(white: 0.86)
-        let baseWhiteSide = Color(white: 0.80)
-
         // Skip shadows for now - they're causing visual artifacts due to perspective distortion
 
         // Top surface (tapered) - improved shading
@@ -925,11 +914,6 @@ struct Keyboard3DView: View {
         let effectiveCorrect: Bool = {
             if isPressed, let persisted { return persisted } else { return isCorrect(midi) }
         }()
-
-        // Base blacks
-        let topBase = Color(white: 0.10)
-        let sideBase = Color(white: 0.06)
-        let frontBase = Color(white: 0.04)
 
         // Skip shadows for now - they're causing visual artifacts due to perspective distortion
 
