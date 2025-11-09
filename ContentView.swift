@@ -12,6 +12,11 @@ import Combine
 import CoreMIDI
 import SwiftUI
 
+// Simple logging function
+fileprivate func Log(_ message: String) {
+    print("[MIDIMonitor] \(message)")
+}
+
 // struct representing last data received of each type
 
 struct MIDIMonitorData {
@@ -58,6 +63,11 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     // Per-event publishers (Option A): emit exact payloads for immediate handling
     let noteOnSubject = PassthroughSubject<(Int, Int), Never>()
     let noteOffSubject = PassthroughSubject<Int, Never>()
+    
+    // Bluetooth MIDI manager (optional, for enhanced device management)
+    lazy var bluetoothManager: BluetoothMIDIManager = {
+        BluetoothMIDIManager(midi: self.midi)
+    }()
 
     init() {
         // Configure audio chain
@@ -86,9 +96,11 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         // Ensure instrument is loaded (idempotent)
         loadInstrument()
         
+        Log("🎵 Opening MIDI inputs...")
         midi.openInput(name: "Bluetooth")
         midi.openInput()
         midi.addListener(self)
+        Log("🎵 MIDI listener registered. Available inputs: \(midi.inputNames)")
 
         if !engineStarted {
             do {
@@ -120,6 +132,8 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
                             portID _: MIDIUniqueID?,
                             timeStamp _: MIDITimeStamp?)
     {
+        Log("🎹 MIDI Note ON received: note=\(noteNumber), velocity=\(velocity), channel=\(channel)")
+        
         // Trigger audio immediately and emit payload (avoid SwiftUI state coalescing)
         let note = Int(noteNumber)
         let vel  = Int(velocity)
@@ -365,6 +379,7 @@ private func noteName(from midiNote: Int) -> String {
 enum NavigationDestination: Hashable {
     case calibration
     case history
+    case midiSettings
 }
 
 struct ContentView: View {
@@ -914,6 +929,8 @@ struct ContentView: View {
                 .environmentObject(conductor)
             case .history:
               PracticeHistoryView(navigationPath: $navigationPath)
+            case .midiSettings:
+              MIDIDeviceSettingsView(bluetoothManager: conductor.bluetoothManager)
           }
         }
         .sheet(isPresented: $showingResults) {
@@ -1004,12 +1021,29 @@ struct ContentView: View {
         
         // Right-aligned controls
         HStack(spacing: 8) {
+          // Show Bluetooth indicator if connected
+          if conductor.bluetoothManager.hasBluetoothDevice {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+              .foregroundStyle(.blue)
+              .font(.caption)
+              .help("Bluetooth MIDI device connected")
+          }
+          
           Text(calibrationDisplayText)
             .font(Platform.calibrationFont)
             .foregroundColor(.white)
             .fixedSize()
             .lineLimit(1)
             .frame(minWidth: Platform.calibrationWidth)
+          
+          Button("MIDI") {
+            navigationPath.append(NavigationDestination.midiSettings)
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.white)
+          .foregroundStyle(.black)
+          .controlSize(Platform.buttonControlSize)
+          .help("Configure MIDI devices")
           
           Button("History") {
             navigationPath.append(NavigationDestination.history)
