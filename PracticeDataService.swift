@@ -87,7 +87,94 @@ final class PracticeDataService {
             modelContext.delete(session)
         }
         try modelContext.save()
-        print("🗑️ Deleted all practice sessions")
+        print("🗑️ Deleted all \(sessions.count) practice sessions")
+    }
+    
+    /// Deletes practice sessions older than a specified number of days
+    @MainActor
+    func deleteSessionsOlderThan(days: Int) throws -> Int {
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        
+        let descriptor = FetchDescriptor<PracticeSession>(
+            predicate: #Predicate { session in
+                session.startDate < cutoffDate
+            }
+        )
+        
+        let oldSessions = try modelContext.fetch(descriptor)
+        let count = oldSessions.count
+        
+        for session in oldSessions {
+            modelContext.delete(session)
+        }
+        
+        try modelContext.save()
+        print("🗑️ Deleted \(count) practice sessions older than \(days) days")
+        return count
+    }
+    
+    /// Gets the total storage size of all practice sessions (approximate)
+    @MainActor
+    func getDatabaseSize() -> String {
+        // SwiftData stores in a SQLite file in the app's container
+        guard let storeURL = modelContext.container.configurations.first?.url else {
+            return "Unknown"
+        }
+        
+        let fileManager = FileManager.default
+        var totalSize: Int64 = 0
+        
+        // Check main database file
+        if let attrs = try? fileManager.attributesOfItem(atPath: storeURL.path),
+           let size = attrs[.size] as? Int64 {
+            totalSize += size
+        }
+        
+        // Check for -wal and -shm files (SQLite write-ahead log)
+        let walURL = storeURL.appendingPathExtension("wal")
+        let shmURL = storeURL.appendingPathExtension("shm")
+        
+        if let walAttrs = try? fileManager.attributesOfItem(atPath: walURL.path),
+           let walSize = walAttrs[.size] as? Int64 {
+            totalSize += walSize
+        }
+        
+        if let shmAttrs = try? fileManager.attributesOfItem(atPath: shmURL.path),
+           let shmSize = shmAttrs[.size] as? Int64 {
+            totalSize += shmSize
+        }
+        
+        return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
+    }
+    
+    /// Exports all practice sessions to CSV format
+    @MainActor
+    func exportToCSV() throws -> String {
+        let sessions = try fetchAllSessions()
+        
+        var csv = "Date,Time,Duration (seconds),Total Notes,First Try Correct,Multiple Attempts,Accuracy,Clef Mode,Accidentals,MIDI Range\n"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        let timeFormatter = DateFormatter()
+        timeFormatter.timeStyle = .short
+        
+        for session in sessions {
+            let date = dateFormatter.string(from: session.startDate)
+            let time = timeFormatter.string(from: session.startDate)
+            let duration = Int(session.duration)
+            let totalNotes = session.totalAttempts
+            let firstTry = session.firstTryCorrect
+            let multiple = session.multipleAttempts
+            let accuracy = totalNotes > 0 ? (Double(firstTry) / Double(firstTry + multiple)) * 100 : 0
+            let clefMode = session.settings.clefModeEnum.rawValue
+            let accidentals = session.settings.includeAccidentals ? "Yes" : "No"
+            let range = session.settings.allowedRange.map { "\($0.lowerBound)-\($0.upperBound)" } ?? "Full"
+            
+            csv += "\(date),\(time),\(duration),\(totalNotes),\(firstTry),\(multiple),\(String(format: "%.1f%%", accuracy)),\(clefMode),\(accidentals),\(range)\n"
+        }
+        
+        return csv
     }
     
     // MARK: - Statistics and Analysis

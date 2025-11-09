@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct PracticeHistoryView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appData: AppData
     
     @State private var practiceDataService: PracticeDataService?
     @State private var sessions: [PracticeSession] = []
@@ -13,6 +15,11 @@ struct PracticeHistoryView: View {
     @State private var sessionToDelete: PracticeSession?
     @State private var showingStatistics = false
     @State private var selectedSession: PracticeSession?
+    @State private var showingDataManagement = false
+    @State private var showingClearAllAlert = false
+    @State private var showingExportSheet = false
+    @State private var exportedCSV: String = ""
+    @State private var databaseSize: String = "Calculating..."
     
     var body: some View {
         NavigationSplitView {
@@ -70,10 +77,27 @@ struct PracticeHistoryView: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
-                Button("Statistics") {
-                    showingStatistics = true
+                Menu {
+                    Button(action: { showingStatistics = true }) {
+                        Label("Statistics", systemImage: "chart.bar.fill")
+                    }
+                    
+                    Button(action: { showingDataManagement = true }) {
+                        Label("Data Management", systemImage: "gearshape.fill")
+                    }
+                    
+                    Divider()
+                    
+                    Button(action: { exportData() }) {
+                        Label("Export to CSV", systemImage: "square.and.arrow.up")
+                    }
+                    
+                    Button(role: .destructive, action: { showingClearAllAlert = true }) {
+                        Label("Clear All History", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
-                .buttonStyle(.bordered)
             }
         }
         .alert("Delete Session", isPresented: $showingDeleteAlert) {
@@ -86,9 +110,22 @@ struct PracticeHistoryView: View {
                 Text("Are you sure you want to delete the practice session from \(session.startDate, style: .date) at \(session.startDate, style: .time)?")
             }
         }
+        .alert("Clear All History", isPresented: $showingClearAllAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete All", role: .destructive) {
+                clearAllHistory()
+            }
+        } message: {
+            Text("This will permanently delete all \(sessions.count) practice sessions. This cannot be undone.")
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ShareSheet(items: [exportedCSV])
+        }
         .onAppear {
             setupDataService()
             loadSessions()
+            updateDatabaseSize()
+            performAutoCleanupIfNeeded()
         }
         .sheet(isPresented: $showingStatistics) {
             NavigationView {
@@ -102,6 +139,35 @@ struct PracticeHistoryView: View {
                     }
             }
             .frame(minWidth: 800, minHeight: 600)
+        }
+        .sheet(isPresented: $showingDataManagement) {
+            NavigationView {
+                DataManagementView(
+                    databaseSize: databaseSize,
+                    sessionCount: sessions.count,
+                    onClearAll: {
+                        showingDataManagement = false
+                        showingClearAllAlert = true
+                    },
+                    onExport: {
+                        showingDataManagement = false
+                        exportData()
+                    },
+                    onCleanupOld: { days in
+                        showingDataManagement = false
+                        cleanupOldSessions(days: days)
+                    }
+                )
+                .environmentObject(appData)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") {
+                            showingDataManagement = false
+                        }
+                    }
+                }
+            }
+            .frame(minWidth: 600, minHeight: 500)
         }
     }
     
@@ -284,10 +350,86 @@ struct PracticeHistoryView: View {
                 
                 sessions.removeAll { $0.id == session.id }
                 sessionToDelete = nil
+                updateDatabaseSize()
                 print("🗑️ Deleted session from \(session.startDate)")
             } catch {
                 print("❌ Failed to delete session: \(error)")
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func clearAllHistory() {
+        Task { @MainActor in
+            do {
+                guard let dataService = practiceDataService else { return }
+                try dataService.deleteAllSessions()
+                sessions.removeAll()
+                selectedSession = nil
+                updateDatabaseSize()
+                print("🗑️ Cleared all practice history")
+            } catch {
+                print("❌ Failed to clear history: \(error)")
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func cleanupOldSessions(days: Int) {
+        Task { @MainActor in
+            do {
+                guard let dataService = practiceDataService else { return }
+                let deletedCount = try dataService.deleteSessionsOlderThan(days: days)
+                
+                if deletedCount > 0 {
+                    loadSessions() // Reload to reflect changes
+                    updateDatabaseSize()
+                    print("🗑️ Cleaned up \(deletedCount) old sessions")
+                }
+            } catch {
+                print("❌ Failed to cleanup old sessions: \(error)")
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func exportData() {
+        Task { @MainActor in
+            do {
+                guard let dataService = practiceDataService else { return }
+                exportedCSV = try dataService.exportToCSV()
+                showingExportSheet = true
+            } catch {
+                print("❌ Failed to export data: \(error)")
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func updateDatabaseSize() {
+        Task { @MainActor in
+            guard let dataService = practiceDataService else { return }
+            databaseSize = dataService.getDatabaseSize()
+        }
+    }
+    
+    private func performAutoCleanupIfNeeded() {
+        guard appData.shouldPerformAutoCleanup() else { return }
+        guard let days = appData.historyRetentionPeriod.days else { return }
+        
+        Task { @MainActor in
+            do {
+                guard let dataService = practiceDataService else { return }
+                let deletedCount = try dataService.deleteSessionsOlderThan(days: days)
+                
+                if deletedCount > 0 {
+                    print("🧹 Auto-cleanup: Deleted \(deletedCount) sessions older than \(days) days")
+                    loadSessions() // Reload to reflect changes
+                }
+                
+                appData.lastCleanupDate = Date()
+            } catch {
+                print("❌ Auto-cleanup failed: \(error)")
             }
         }
     }
@@ -521,5 +663,193 @@ struct PracticeSessionDetailView: View {
     NavigationStack {
         PracticeHistoryView(navigationPath: .constant(NavigationPath()))
             .modelContainer(for: PracticeSession.self, inMemory: true)
+            .environmentObject(AppData())
     }
 }
+
+// MARK: - Data Management View
+
+/// A view that provides data management options for practice history
+///
+/// This view allows users to:
+/// - View storage information (session count and database size)
+/// - Configure automatic cleanup retention periods
+/// - Export practice data to CSV
+/// - Manually delete old sessions
+/// - Clear all practice history
+///
+/// Layout improvements:
+/// - Uses `.fixedSize(horizontal: false, vertical: true)` to prevent text truncation
+/// - Applies `.formStyle(.grouped)` on macOS for better visual hierarchy
+/// - Uses VStack layout for retention period picker to avoid label cutoff
+struct DataManagementView: View {
+    @EnvironmentObject private var appData: AppData
+    let databaseSize: String
+    let sessionCount: Int
+    let onClearAll: () -> Void
+    let onExport: () -> Void
+    let onCleanupOld: (Int) -> Void
+    
+    @State private var showingCleanupConfirmation = false
+    @State private var cleanupDays: Int = 30
+    
+    var body: some View {
+        Form {
+            // Storage Information Section
+            Section {
+                HStack {
+                    Text("Practice Sessions")
+                        .fixedSize(horizontal: false, vertical: true) // Prevents text truncation
+                    Spacer()
+                    Text("\(sessionCount)")
+                        .foregroundStyle(.secondary)
+                }
+                
+                HStack {
+                    Text("Storage Used")
+                        .fixedSize(horizontal: false, vertical: true) // Prevents text truncation
+                    Spacer()
+                    Text(databaseSize)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Storage Information")
+            }
+            
+            // Automatic Cleanup Section
+            Section {
+                // Use VStack to prevent picker label from being cut off
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Retention Period")
+                        .font(.subheadline)
+                    
+                    Picker("", selection: $appData.historyRetentionPeriod) {
+                        ForEach(HistoryRetentionPeriod.allCases) { period in
+                            Text(period.displayName).tag(period)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
+                
+                if appData.historyRetentionPeriod != .forever {
+                    Text("Older sessions will be automatically deleted daily.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true) // Allows text to wrap properly
+                }
+            } header: {
+                Text("Automatic Cleanup")
+            } footer: {
+                Text("Select how long to keep your practice history. Older sessions will be automatically removed.")
+                    .fixedSize(horizontal: false, vertical: true) // Ensures footer text wraps instead of truncating
+            }
+            
+            // Data Management Actions Section
+            Section {
+                Button(action: onExport) {
+                    Label("Export to CSV", systemImage: "square.and.arrow.up")
+                }
+                
+                Button(action: {
+                    cleanupDays = 30
+                    showingCleanupConfirmation = true
+                }) {
+                    Label("Delete Sessions Older Than...", systemImage: "calendar.badge.minus")
+                        .fixedSize(horizontal: false, vertical: true) // Prevents label truncation
+                }
+            } header: {
+                Text("Data Management")
+            }
+            
+            // Danger Zone Section
+            Section {
+                Button(role: .destructive, action: onClearAll) {
+                    Label("Clear All Practice History", systemImage: "trash.fill")
+                        .fixedSize(horizontal: false, vertical: true) // Prevents label truncation
+                }
+            } header: {
+                Text("Danger Zone")
+            } footer: {
+                Text("Clearing all history will permanently delete all \(sessionCount) practice sessions. This cannot be undone.")
+                    .fixedSize(horizontal: false, vertical: true) // Ensures footer text wraps properly
+            }
+        }
+        #if os(macOS)
+        .formStyle(.grouped) // Provides better spacing and visual hierarchy on macOS
+        #endif
+        .navigationTitle("Data Management")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .alert("Delete Old Sessions", isPresented: $showingCleanupConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                onCleanupOld(cleanupDays)
+            }
+            
+            // Picker for days
+            Picker("Older than", selection: $cleanupDays) {
+                Text("7 days").tag(7)
+                Text("30 days").tag(30)
+                Text("90 days").tag(90)
+                Text("1 year").tag(365)
+            }
+        } message: {
+            Text("Delete practice sessions older than \(cleanupDays) days?")
+        }
+    }
+}
+
+// MARK: - Share Sheet Helper
+
+#if os(iOS)
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        // Create a temporary file for the CSV
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("PracticeHistory.csv")
+        
+        if let csvString = items.first as? String {
+            try? csvString.write(to: tempURL, atomically: true, encoding: .utf8)
+            return UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+        }
+        
+        return UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#else
+struct ShareSheet: NSViewRepresentable {
+    let items: [Any]
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        
+        DispatchQueue.main.async {
+            // Create a temporary file for the CSV
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("PracticeHistory.csv")
+            
+            if let csvString = items.first as? String {
+                try? csvString.write(to: tempURL, atomically: true, encoding: .utf8)
+                
+                let picker = NSSavePanel()
+                picker.allowedContentTypes = [.commaSeparatedText]
+                picker.nameFieldStringValue = "PracticeHistory.csv"
+                
+                picker.begin { response in
+                    if response == .OK, let url = picker.url {
+                        try? FileManager.default.copyItem(at: tempURL, to: url)
+                    }
+                }
+            }
+        }
+        
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#endif
