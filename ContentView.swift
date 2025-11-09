@@ -68,11 +68,24 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     lazy var bluetoothManager: BluetoothMIDIManager = {
         BluetoothMIDIManager(midi: self.midi)
     }()
+    
+    // MARK: - Stuck Note Prevention
+    /// Track when each note was turned on to detect stuck notes
+    private var noteOnTimestamps: [Int: Date] = [:]
+    /// Maximum duration a note can be held before being automatically released (10 seconds)
+    private let stuckNoteTimeout: TimeInterval = 10.0
+    /// Timer for checking stuck notes
+    private var stuckNoteTimer: Timer?
 
     init() {
         // Configure audio chain
         engine.output = instrument
         loadInstrument()
+        startStuckNoteMonitoring()
+    }
+    
+    deinit {
+        stopStuckNoteMonitoring()
     }
     
     private func loadInstrument() {
@@ -125,6 +138,66 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             Log("Audio engine stopped")
         }
     }
+    
+    // MARK: - Stuck Note Prevention
+    
+    /// Start monitoring for stuck notes that remain "on" too long
+    private func startStuckNoteMonitoring() {
+        // Check every 2 seconds for stuck notes
+        stuckNoteTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.checkForStuckNotes()
+        }
+    }
+    
+    /// Stop stuck note monitoring
+    private func stopStuckNoteMonitoring() {
+        stuckNoteTimer?.invalidate()
+        stuckNoteTimer = nil
+    }
+    
+    /// Check for and automatically release notes that have been on too long
+    private func checkForStuckNotes() {
+        let now = Date()
+        var stuckNotes: [Int] = []
+        
+        for (note, timestamp) in noteOnTimestamps {
+            let duration = now.timeIntervalSince(timestamp)
+            if duration > stuckNoteTimeout {
+                stuckNotes.append(note)
+            }
+        }
+        
+        // Release stuck notes
+        for note in stuckNotes {
+            Log("⚠️ Auto-releasing stuck note: \(note) (held for \(String(format: "%.1f", stuckNoteTimeout))s)")
+            forceNoteOff(noteNumber: note)
+        }
+    }
+    
+    /// Force a note off, bypassing normal MIDI flow (for stuck note recovery)
+    func forceNoteOff(noteNumber: Int) {
+        // Stop audio
+        instrument.stop(noteNumber: MIDINoteNumber(noteNumber), channel: 0)
+        
+        // Clear from tracking
+        noteOnTimestamps.removeValue(forKey: noteNumber)
+        
+        // Emit note off subject
+        DispatchQueue.main.async {
+            self.noteOffSubject.send(noteNumber)
+            self.activeNotes.remove(noteNumber)
+        }
+    }
+    
+    /// Manually clear all stuck notes (can be called from UI)
+    func clearAllNotes() {
+        Log("🧹 Clearing all active notes (panic button)")
+        let currentNotes = Array(activeNotes)
+        for note in currentNotes {
+            forceNoteOff(noteNumber: note)
+        }
+        noteOnTimestamps.removeAll()
+    }
 
     func receivedMIDINoteOn(noteNumber: MIDINoteNumber,
                             velocity: MIDIVelocity,
@@ -140,12 +213,17 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         if vel > 0 {
             let boosted = min(127, Int(round(Double(vel) * externalVelocityBoost)))
             instrument.play(noteNumber: MIDINoteNumber(note), velocity: MIDIVelocity(boosted), channel: 0)
+            
+            // Track when this note was turned on (for stuck note detection)
+            noteOnTimestamps[note] = Date()
+            
             DispatchQueue.main.async {
                 self.noteOnSubject.send((note, boosted))
             }
         } else {
             // Treat Note On with velocity 0 as Note Off
             instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
+            noteOnTimestamps.removeValue(forKey: note)
             DispatchQueue.main.async {
                 self.noteOffSubject.send(note)
             }
@@ -179,6 +257,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         // Trigger audio immediately and emit payload
         let note = Int(noteNumber)
         instrument.stop(noteNumber: MIDINoteNumber(note), channel: 0)
+        
+        // Clear stuck note tracking
+        noteOnTimestamps.removeValue(forKey: note)
+        
         DispatchQueue.main.async {
             self.noteOffSubject.send(note)
         }
@@ -930,7 +1012,7 @@ struct ContentView: View {
             case .history:
               PracticeHistoryView(navigationPath: $navigationPath)
             case .midiSettings:
-              MIDIDeviceSettingsView(bluetoothManager: conductor.bluetoothManager)
+              MIDIDeviceSettingsView(bluetoothManager: conductor.bluetoothManager, conductor: conductor)
           }
         }
         .sheet(isPresented: $showingResults) {

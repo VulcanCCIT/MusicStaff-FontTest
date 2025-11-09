@@ -244,7 +244,13 @@ struct KeyBoardView: View {
           let boosted = min(127, Int(round(Double(velocity) * 2.25)))
           let norm = max(0.0, min(1.0, Double(boosted) / 127.0))
           externalVelocities[note] = norm
-          pressedCorrectness[note] = isCorrect(note)
+          
+          // CRITICAL FIX: Only set correctness if not already set (prevents race condition
+          // where target note changes after correct answer, causing second evaluation to be wrong)
+          if pressedCorrectness[note] == nil {
+              let correctness = isCorrect(note)
+              pressedCorrectness[note] = correctness
+          }
       }
       .onReceive(conductor.noteOffSubject) { note in
           // Remove visual intensity; audio already triggered in conductor
@@ -785,7 +791,11 @@ struct Keyboard3DView: View {
         // State coloring (tint when pressed and correctness known)
         let persisted: Bool? = pressedCorrectness[midi]
         let effectiveCorrect: Bool = {
-            if isPressed, let persisted { return persisted } else { return isCorrect(midi) }
+            if isPressed, let persisted {
+                return persisted
+            } else {
+                return isCorrect(midi)
+            }
         }()
 
         // Skip shadows for now - they're causing visual artifacts due to perspective distortion
@@ -912,7 +922,11 @@ struct Keyboard3DView: View {
 
         let persisted: Bool? = pressedCorrectness[midi]
         let effectiveCorrect: Bool = {
-            if isPressed, let persisted { return persisted } else { return isCorrect(midi) }
+            if isPressed, let persisted {
+                return persisted
+            } else {
+                return isCorrect(midi)
+            }
         }()
 
         // Skip shadows for now - they're causing visual artifacts due to perspective distortion

@@ -212,6 +212,7 @@ class BluetoothMIDIManager: ObservableObject {
 /// SwiftUI view for displaying MIDI device settings
 struct MIDIDeviceSettingsView: View {
     @ObservedObject var bluetoothManager: BluetoothMIDIManager
+    var conductor: MIDIMonitorConductor? // Optional reference to conductor for panic button
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -262,8 +263,22 @@ struct MIDIDeviceSettingsView: View {
                 }) {
                     Label("Reconnect All Devices", systemImage: "arrow.triangle.2.circlepath")
                 }
+                
+                if let conductor = conductor {
+                    Button(role: .destructive, action: {
+                        conductor.clearAllNotes()
+                    }) {
+                        Label("Clear Stuck Notes (Panic)", systemImage: "exclamationmark.triangle.fill")
+                    }
+                }
             } header: {
                 Text("Actions")
+            } footer: {
+                if conductor != nil {
+                    Text("Use 'Clear Stuck Notes' if a key remains highlighted after you've released it. This can happen due to Bluetooth interference.")
+                } else {
+                    Text("Refresh devices to detect newly connected MIDI hardware.")
+                }
             }
         }
         .navigationTitle("MIDI Devices")
