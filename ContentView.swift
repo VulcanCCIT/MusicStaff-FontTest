@@ -719,16 +719,16 @@ struct ContentView: View {
           midiReceivedIndicator
           
           Spacer()
-            .frame(height: 20)
+            .frame(height: 25)
           
           // Removed inline KeyBoardView here per instructions
           
           // Staff and note drawing with speakers
-          HStack(alignment: .center, spacing: 0) {
+          HStack(alignment: .top, spacing: 0) {
             Spacer()
               .frame(maxWidth: 120)
             
-            // Left speaker
+            // Left speaker - aligned to top
             SpeakerView(
               isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
               velocity: conductor.data.velocity
@@ -843,17 +843,28 @@ struct ContentView: View {
             .foregroundStyle(.white)
             
             // Labels for clef, note name and MIDI code
-            HStack(spacing: 12) {
+            HStack(spacing: Platform.labelSpacing) {
               Spacer()
               
               // Show hints only if enabled
               if appData.showHints {
                 Text("Clef:")
+                  .font(Platform.labelFont)
                 Text(vm.currentClef == .treble ? "Treble" : "Bass")
+                  .font(Platform.labelFont)
+                  .frame(minWidth: Platform.clefWidth, alignment: .leading)
                 Text("Note:")
-                Text(vm.currentNote.name).monospaced()
+                  .font(Platform.labelFont)
+                Text(vm.currentNote.name)
+                  .font(Platform.labelFont)
+                  .monospaced()
+                  .frame(minWidth: Platform.noteWidth, alignment: .leading)
                 Text("MIDI:")
-                Text(String(vm.currentNote.midi)).monospaced()
+                  .font(Platform.labelFont)
+                Text(String(vm.currentNote.midi))
+                  .font(Platform.labelFont)
+                  .monospaced()
+                  .frame(minWidth: Platform.midiWidth, alignment: .leading)
               }
               
               // New Note button centered with the text
@@ -873,21 +884,36 @@ struct ContentView: View {
             }
             
             // Received values from MIDI to compare with the random note above
-            HStack(spacing: 12) {
+            HStack(spacing: Platform.labelSpacing) {
+              Spacer()
+              
               Text("Received Clef:")
+                .font(Platform.labelFont)
               Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
+                .font(Platform.labelFont)
+                .frame(minWidth: Platform.clefWidth, alignment: .leading)
+              
               Text("Received Note:")
+                .font(Platform.labelFont)
               Text(noteName(from: conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
+                .frame(minWidth: Platform.noteWidth, alignment: .leading)
+              
               Text("Received MIDI:")
+                .font(Platform.labelFont)
               Text(String(conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
+                .frame(minWidth: Platform.midiWidth, alignment: .leading)
+              
+              Spacer()
             }
           } // End staff VStack
           
           Spacer()
           
-          // Right speaker
+          // Right speaker - aligned to top
           SpeakerView(
             isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
             velocity: conductor.data.velocity
@@ -898,6 +924,7 @@ struct ContentView: View {
             .frame(maxWidth: 120)
         } // End HStack with speakers
         .padding(.horizontal, 20)
+        //.padding(.top, 10) // Add top padding to raise entire row
         .foregroundStyle(.white)
           
           // Practice mode controls or free play button
@@ -1195,6 +1222,12 @@ struct ContentView: View {
     static let calibrationWidth: CGFloat = 80
     static let buttonControlSize: ControlSize = .small
     static let horizontalPadding: CGFloat = 16
+    // Label sizing for staff area
+    static let labelFont: Font = .body
+    static let labelSpacing: CGFloat = 12
+    static let clefWidth: CGFloat = 50
+    static let noteWidth: CGFloat = 40
+    static let midiWidth: CGFloat = 30
     #else
     static let isMac = false
     static let menuBarSpacing: CGFloat = 10
@@ -1208,6 +1241,12 @@ struct ContentView: View {
     static let calibrationWidth: CGFloat = 60
     static let buttonControlSize: ControlSize = .mini
     static let horizontalPadding: CGFloat = 8
+    // Label sizing for staff area (smaller for iPad)
+    static let labelFont: Font = .caption
+    static let labelSpacing: CGFloat = 6
+    static let clefWidth: CGFloat = 42
+    static let noteWidth: CGFloat = 32
+    static let midiWidth: CGFloat = 24
     #endif
   }
 } // ContentView
