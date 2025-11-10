@@ -1143,11 +1143,11 @@ struct ContentView: View {
           .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
           
           Toggle("Sharps/Flats", isOn: $appData.includeAccidentals)
-            .controlSize(Platform.toggleSize)
+            .toggleStyle(CustomToggleStyle())
             .fixedSize()
           
           Toggle("Show Hints", isOn: $appData.showHints)
-            .controlSize(Platform.toggleSize)
+            .toggleStyle(CustomToggleStyle())
             .fixedSize()
         }
         
@@ -1277,6 +1277,58 @@ struct ContentView: View {
       .environmentObject(MIDIMonitorConductor())
       .frame(width: 900, height: 900)
   }
+
+// MARK: - Custom Toggle Style
+struct CustomToggleStyle: ToggleStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    HStack(spacing: 6) {
+      // Custom checkbox with better visibility
+      ZStack {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .strokeBorder(Color.white.opacity(0.7), lineWidth: 1.5)
+          .background(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+              .fill(configuration.isOn ? Color.white.opacity(0.25) : Color.white.opacity(0.08))
+          )
+          .frame(width: checkboxSize, height: checkboxSize)
+        
+        if configuration.isOn {
+          Image(systemName: "checkmark")
+            .font(.system(size: checkmarkSize, weight: .bold))
+            .foregroundColor(.white)
+        }
+      }
+      .contentShape(Rectangle())
+      .onTapGesture {
+        configuration.isOn.toggle()
+      }
+      
+      configuration.label
+        .foregroundColor(.white)
+    }
+    .contentShape(Rectangle())
+    .onTapGesture {
+      configuration.isOn.toggle()
+    }
+  }
+  
+  // Platform-specific sizing
+  private var checkboxSize: CGFloat {
+    #if os(macOS)
+    return 16
+    #else
+    return 18 // Slightly larger on iPad for easier touch targets
+    #endif
+  }
+  
+  private var checkmarkSize: CGFloat {
+    #if os(macOS)
+    return 11
+    #else
+    return 12 // Slightly larger on iPad
+    #endif
+  }
+}
 
 // MARK: - View Extension
 private extension View {
