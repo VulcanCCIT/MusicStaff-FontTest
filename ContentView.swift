@@ -950,38 +950,9 @@ struct ContentView: View {
             // Practice mode controls only (New Note button is now in clef HStack above)
             HStack(spacing: 12) {
               Text("Practice")
-              HStack(spacing: 8) {
-                Text("Count:")
-                Text("\(practiceCount)")
-                  .monospaced()
-                
-                HStack(spacing: 6) {
-                  Button {
-                    practiceCount = max(5, practiceCount - 5)
-                  } label: {
-                    Image(systemName: "chevron.down")
-                      .font(.system(size: 12, weight: .semibold))
-                      .foregroundStyle(.white)
-                      .padding(6)
-                      .background(Color.white.opacity(0.12))
-                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                  }
-                  .buttonStyle(.plain)
-                  
-                  Button {
-                    practiceCount = min(100, practiceCount + 5)
-                  } label: {
-                    Image(systemName: "chevron.up")
-                      .font(.system(size: 12, weight: .semibold))
-                      .foregroundStyle(.white)
-                      .padding(6)
-                      .background(Color.white.opacity(0.12))
-                      .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                  }
-                  .buttonStyle(.plain)
-                }
-              }
-              .foregroundStyle(.white)
+                .foregroundColor(.white)
+              
+              CustomNumberPicker("Count:", value: $practiceCount, in: 5...100, step: 5)
               
               Button("Start Practice") {
                 startPractice()
@@ -1277,6 +1248,126 @@ struct ContentView: View {
       .environmentObject(MIDIMonitorConductor())
       .frame(width: 900, height: 900)
   }
+
+// MARK: - Custom Wheel Picker (Works on both platforms)
+struct CustomNumberPicker: View {
+  @Binding var value: Int
+  let range: ClosedRange<Int>
+  let step: Int
+  let label: String
+  
+  @State private var showingPicker = false
+  
+  init(
+    _ label: String,
+    value: Binding<Int>,
+    in range: ClosedRange<Int>,
+    step: Int = 1
+  ) {
+    self.label = label
+    self._value = value
+    self.range = range
+    self.step = step
+  }
+  
+  var body: some View {
+    HStack(spacing: 8) {
+      Text(label)
+        .foregroundColor(.white)
+      
+      Button(action: {
+        showingPicker.toggle()
+      }) {
+        HStack(spacing: 4) {
+          Text("\(value)")
+            .font(.system(.body, design: .monospaced))
+            .fontWeight(.medium)
+            .foregroundColor(.white)
+          
+          Image(systemName: "chevron.up.chevron.down")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundColor(.white.opacity(0.6))
+        }
+        .frame(width: 80, height: platformHeight)
+        .background(Color.white.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+        )
+      }
+      .buttonStyle(.plain)
+      #if os(macOS)
+      .popover(
+        isPresented: $showingPicker,
+        arrowEdge: .top
+      ) {
+        pickerContent
+      }
+      #else
+      .popover(
+        isPresented: $showingPicker,
+        attachmentAnchor: .point(.top),
+        arrowEdge: .bottom
+      ) {
+        pickerContent
+          .presentationCompactAdaptation(.popover)
+      }
+      #endif
+      .fixedSize()
+    }
+  }
+  
+  private var pickerContent: some View {
+    VStack(spacing: 0) {
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(spacing: 0) {
+            ForEach(Array(stride(from: range.lowerBound, through: range.upperBound, by: step)), id: \.self) { number in
+              Button(action: {
+                value = number
+                showingPicker = false
+              }) {
+                Text("\(number)")
+                  .font(.system(.body, design: .monospaced))
+                  .fontWeight(number == value ? .semibold : .regular)
+                  .foregroundColor(number == value ? .white : .primary)
+                  .frame(maxWidth: .infinity)
+                  .padding(.vertical, 8)
+                  .padding(.horizontal, 20)
+                  .background(number == value ? Color.accentColor : Color.clear)
+                  .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+              .id(number)
+              
+              if number != range.upperBound {
+                Divider()
+              }
+            }
+          }
+        }
+        .frame(width: 100, height: 250)
+        .onAppear {
+          proxy.scrollTo(value, anchor: .center)
+        }
+      }
+    }
+    #if os(macOS)
+    .background(Color(nsColor: .controlBackgroundColor))
+    #else
+    .background(Color(uiColor: .systemBackground))
+    #endif
+  }
+  
+  private var platformHeight: CGFloat {
+    #if os(macOS)
+    return 28
+    #else
+    return 32 // Slightly taller for easier touch on iPad
+    #endif
+  }
+}
 
 // MARK: - Custom Toggle Style
 struct CustomToggleStyle: ToggleStyle {
