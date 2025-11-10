@@ -723,9 +723,23 @@ struct ContentView: View {
           
           // Removed inline KeyBoardView here per instructions
           
-          // Staff and note drawing (panel removed)
-          VStack(spacing: 16) {
-            Canvas { context, size in
+          // Staff and note drawing with speakers
+          HStack(alignment: .center, spacing: 0) {
+            Spacer()
+              .frame(maxWidth: 120)
+            
+            // Left speaker
+            SpeakerView(
+              isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
+              velocity: conductor.data.velocity
+            )
+            .frame(width: 115, height: 155)
+            
+            Spacer()
+            
+            // Staff in the middle
+            VStack(spacing: 16) {
+              Canvas { context, size in
               // Center the entire staff/note drawing within the canvas
               let centerX = size.width / 2
               let centerY = size.height / 2
@@ -869,9 +883,22 @@ struct ContentView: View {
               Text(String(conductor.data.noteOn))
                 .monospaced()
             }
-          }
-          .padding(.horizontal, 20)
-          .foregroundStyle(.white)
+          } // End staff VStack
+          
+          Spacer()
+          
+          // Right speaker
+          SpeakerView(
+            isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
+            velocity: conductor.data.velocity
+          )
+          .frame(width: 115, height: 155)
+          
+          Spacer()
+            .frame(maxWidth: 120)
+        } // End HStack with speakers
+        .padding(.horizontal, 20)
+        .foregroundStyle(.white)
           
           // Practice mode controls or free play button
           if isPracticeMode {
@@ -1223,4 +1250,5 @@ private extension View {
     }
   }
 }
+
 
