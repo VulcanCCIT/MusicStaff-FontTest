@@ -647,6 +647,8 @@ struct ContentView: View {
   
   @StateObject private var vm = StaffViewModel()
   @EnvironmentObject private var conductor: MIDIMonitorConductor
+  @EnvironmentObject private var bluetoothManager: BluetoothMIDIManager
+  
   // Removed: @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
   
@@ -1207,7 +1209,7 @@ struct ContentView: View {
             case .history:
               PracticeHistoryView(navigationPath: $navigationPath)
             case .midiSettings:
-              MIDIDeviceSettingsView(bluetoothManager: conductor.bluetoothManager, conductor: conductor)
+              MIDIDeviceSettingsView(bluetoothManager: bluetoothManager, conductor: conductor)
           }
         }
         .sheet(isPresented: $showingResults) {
@@ -1299,7 +1301,7 @@ struct ContentView: View {
         // Right-aligned controls
         HStack(spacing: 8) {
           // Show Bluetooth indicator if connected
-          if conductor.bluetoothManager.hasBluetoothDevice {
+          if bluetoothManager.hasBluetoothDevice {
             Image(systemName: "antenna.radiowaves.left.and.right")
               .foregroundStyle(.blue)
               .font(.caption)
@@ -1402,27 +1404,33 @@ struct ContentView: View {
   #Preview("Whole") {
     let data = AppData()
     data.noteHeadStyle = .whole
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
   
   #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
   
   #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
 
