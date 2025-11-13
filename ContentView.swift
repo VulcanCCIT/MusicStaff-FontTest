@@ -11,6 +11,11 @@ import AudioKitUI
 import Combine
 import CoreMIDI
 import SwiftUI
+import AVFAudio
+
+#if os(macOS)
+import CoreAudio
+#endif
 
 // Simple logging function
 fileprivate func Log(_ message: String) {
@@ -69,6 +74,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         BluetoothMIDIManager(midi: self.midi)
     }()
     
+    #if os(macOS)
+    private var defaultDeviceListenerInstalled = false
+    #endif
+    
     // MARK: - Stuck Note Prevention
     /// Track when each note was turned on to detect stuck notes
     private var noteOnTimestamps: [Int: Date] = [:]
@@ -77,11 +86,50 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     /// Timer for checking stuck notes
     private var stuckNoteTimer: Timer?
 
+    #if os(iOS)
+    /// Configure AVAudioSession for playback (required on iOS/iPadOS to enable AirPlay/HomePod routing)
+    private func configureAudioSessionForPlayback() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // Use .playback to allow AirPlay output; add .mixWithOthers if you want to mix with other apps
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            Log("AVAudioSession configured for playback")
+        } catch {
+            Log("Failed to set up AVAudioSession: \(error)")
+        }
+    }
+    #endif
+
     init() {
         // Configure audio chain
         engine.output = instrument
         loadInstrument()
         startStuckNoteMonitoring()
+        
+        // Observe AVAudioEngine configuration changes (all platforms)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEngineConfigurationChange),
+            name: .AVAudioEngineConfigurationChange,
+            object: nil
+        )
+        
+        // Observe default output device changes (macOS)
+        #if os(macOS)
+        installDefaultOutputDeviceListenerIfNeeded()
+        #endif
+        
+        // Observe AVAudioSession route changes (iOS/iPadOS)
+        #if os(iOS)
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartAudioEngineAfterChange(reason: "AVAudioSessionRouteChange")
+        }
+        #endif
     }
     
     deinit {
@@ -104,10 +152,31 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             Log("Could not load instrument: \(error.localizedDescription)")
         }
     }
+    
+    /// Force-reload the instrument SoundFont on the sampler. Useful after engine/device changes.
+    private func reloadInstrument() {
+        do {
+            if let url = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
+                try instrument.loadInstrument(url: url)
+                instrumentLoaded = true
+                Log("Reloaded instrument successfully after device/engine change")
+            } else {
+                Log("Could not find SoundFont file during reload")
+            }
+        } catch {
+            Log("Could not reload instrument: \(error.localizedDescription)")
+        }
+    }
 
     func start() {
+        // Ensure audio session allows AirPlay/HomePod routing on iPad
+        #if os(iOS)
+        configureAudioSessionForPlayback()
+        #endif
+
         // Ensure instrument is loaded (idempotent)
         loadInstrument()
+        // Ensure correct preset applied even if engine was reconfigured earlier
         
         Log("🎵 Opening MIDI inputs...")
         midi.openInput(name: "Bluetooth")
@@ -198,6 +267,104 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         }
         noteOnTimestamps.removeAll()
     }
+    
+    @objc private func handleEngineConfigurationChange(_ note: Notification) {
+        restartAudioEngineAfterChange(reason: "AVAudioEngineConfigurationChange")
+    }
+
+    private func restartAudioEngineAfterChange(reason: String) {
+        Log("Audio: restarting engine due to \(reason)")
+        do {
+            // Stop the engine if it's currently running. AudioKit's AudioEngine doesn't expose `isRunning`,
+            // so prefer checking the underlying AVAudioEngine when available, otherwise use our own flag.
+            let currentlyRunning: Bool
+            #if canImport(AVFAudio)
+            currentlyRunning = engine.avEngine.isRunning
+            #else
+            currentlyRunning = engineStarted
+            #endif
+            if currentlyRunning {
+                engine.stop()
+                engineStarted = false
+            }
+            // Ensure instrument remains loaded and connected
+            loadInstrument()
+            engine.output = instrument
+
+            // Force-reload the sampler's SoundFont; route changes can drop the loaded preset
+            reloadInstrument()
+
+            #if os(macOS)
+            // Rebind output AU to current default device if possible
+            if let outputAU = engine.avEngine.outputNode.audioUnit {
+                var deviceID = getCurrentDefaultOutputDeviceID()
+                var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+                let status = AudioUnitSetProperty(
+                    outputAU,
+                    kAudioOutputUnitProperty_CurrentDevice,
+                    kAudioUnitScope_Global,
+                    0,
+                    &deviceID,
+                    size
+                )
+                if status != noErr {
+                    Log("Audio: failed to set current device on output AU: \(status)")
+                }
+            }
+            #endif
+
+            try engine.start()
+            engineStarted = true
+            Log("Audio: engine restarted successfully")
+        } catch {
+            Log("Audio: failed to restart engine: \(error)")
+        }
+    }
+
+    #if os(macOS)
+    private func installDefaultOutputDeviceListenerIfNeeded() {
+        guard !defaultDeviceListenerInstalled else { return }
+
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let systemObject = AudioObjectID(kAudioObjectSystemObject)
+        let status = AudioObjectAddPropertyListenerBlock(systemObject, &addr, DispatchQueue.main) { [weak self] _, _ in
+            self?.restartAudioEngineAfterChange(reason: "DefaultOutputDeviceChanged")
+        }
+
+        if status == noErr {
+            defaultDeviceListenerInstalled = true
+        } else {
+            Log("Audio: failed to install default output device listener: \(status)")
+        }
+    }
+
+    private func getCurrentDefaultOutputDeviceID() -> AudioDeviceID {
+        var deviceID = kAudioObjectUnknown
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &addr,
+            0,
+            nil,
+            &size,
+            &deviceID
+        )
+        if status != noErr {
+            Log("Audio: failed to query default output device: \(status)")
+        }
+        return deviceID
+    }
+    #endif
 
     func receivedMIDINoteOn(noteNumber: MIDINoteNumber,
                             velocity: MIDIVelocity,
@@ -850,17 +1017,23 @@ struct ContentView: View {
               if appData.showHints {
                 Text("Clef:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(vm.currentClef == .treble ? "Treble" : "Bass")
                   .font(Platform.labelFont)
                   .frame(minWidth: Platform.clefWidth, alignment: .leading)
                 Text("Note:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(vm.currentNote.name)
                   .font(Platform.labelFont)
                   .monospaced()
                   .frame(minWidth: Platform.noteWidth, alignment: .leading)
                 Text("MIDI:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(String(vm.currentNote.midi))
                   .font(Platform.labelFont)
                   .monospaced()
@@ -895,17 +1068,14 @@ struct ContentView: View {
               
               Text("Received Note:")
                 .font(Platform.labelFont)
-              Text(noteName(from: conductor.data.noteOn))
-                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.noteWidth, alignment: .leading)
               
               Text("Received MIDI:")
                 .font(Platform.labelFont)
-              Text(String(conductor.data.noteOn))
-                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.midiWidth, alignment: .leading)
+                Text(String(conductor.data.noteOn))
               
               Spacer()
             }
@@ -1136,6 +1306,13 @@ struct ContentView: View {
               .help("Bluetooth MIDI device connected")
           }
           
+          #if os(iOS)
+          // AirPlay route picker for selecting HomePod and other AirPlay targets on iPad
+          AirPlayRoutePicker()
+            .frame(width: 32, height: 32)
+            .help("Select AirPlay output")
+          #endif
+          
           Text(calibrationDisplayText)
             .font(Platform.calibrationFont)
             .foregroundColor(.white)
@@ -1248,6 +1425,18 @@ struct ContentView: View {
       .environmentObject(MIDIMonitorConductor())
       .frame(width: 900, height: 900)
   }
+
+#if os(iOS)
+import AVKit
+struct AirPlayRoutePicker: UIViewRepresentable {
+  func makeUIView(context: Context) -> AVRoutePickerView {
+    let view = AVRoutePickerView()
+    view.prioritizesVideoDevices = false
+    return view
+  }
+  func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+#endif
 
 // MARK: - Custom Wheel Picker (Works on both platforms)
 struct CustomNumberPicker: View {
@@ -1432,5 +1621,4 @@ private extension View {
     }
   }
 }
-
 
