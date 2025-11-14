@@ -83,9 +83,10 @@ struct KeyBoardView: View {
   // Helper you can add inside KeyBoardView
   private func scientificLabel(for pitch: Pitch) -> String {
       let midi = pitch.intValue
-      let octave = midi / 12 - 1  // MIDI 60 -> 4
-      // Only label C keys; return empty for others
-      return (midi % 12 == 0) ? "C\(octave)" : ""
+      // Build a musical name (e.g., A3, D6) using the existing helper
+      let name = noteName(from: midi)
+      // Only label natural notes on white keys to avoid clutter
+      return name.contains("#") ? "" : name
   }
   
   var body: some View {
@@ -878,9 +879,14 @@ struct Keyboard3DView: View {
         if !label.isEmpty && showHints {
             // Position 6 points above the top edge to clear the shadow line
             let labelPoint = CGPoint(x: xL + width/2, y: keyEndY - 6)
+            // Scale font size based on key width to prevent labels from touching edges on 88-key keyboards
+            let fontSize = min(12, width * 0.65) // Cap at 12pt but scale down for narrow keys
+            // Calculate kerning based on key width - tighter spacing for narrower keys
+            let kerning = width < 15 ? -1.5 : (width < 20 ? -1.0 : -0.5)
             let labelText = Text(label)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.secondary)
+                .font(.system(size: fontSize, weight: .bold))
+                .kerning(kerning) // Tighten character spacing, especially on narrow keys
+                .foregroundColor(.black)
             context.draw(labelText, at: labelPoint)
         }
     }

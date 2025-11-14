@@ -11,6 +11,11 @@ import AudioKitUI
 import Combine
 import CoreMIDI
 import SwiftUI
+import AVFAudio
+
+#if os(macOS)
+import CoreAudio
+#endif
 
 // Simple logging function
 fileprivate func Log(_ message: String) {
@@ -69,6 +74,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         BluetoothMIDIManager(midi: self.midi)
     }()
     
+    #if os(macOS)
+    private var defaultDeviceListenerInstalled = false
+    #endif
+    
     // MARK: - Stuck Note Prevention
     /// Track when each note was turned on to detect stuck notes
     private var noteOnTimestamps: [Int: Date] = [:]
@@ -77,11 +86,50 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     /// Timer for checking stuck notes
     private var stuckNoteTimer: Timer?
 
+    #if os(iOS)
+    /// Configure AVAudioSession for playback (required on iOS/iPadOS to enable AirPlay/HomePod routing)
+    private func configureAudioSessionForPlayback() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // Use .playback to allow AirPlay output; add .mixWithOthers if you want to mix with other apps
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
+            Log("AVAudioSession configured for playback")
+        } catch {
+            Log("Failed to set up AVAudioSession: \(error)")
+        }
+    }
+    #endif
+
     init() {
         // Configure audio chain
         engine.output = instrument
         loadInstrument()
         startStuckNoteMonitoring()
+        
+        // Observe AVAudioEngine configuration changes (all platforms)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleEngineConfigurationChange),
+            name: .AVAudioEngineConfigurationChange,
+            object: nil
+        )
+        
+        // Observe default output device changes (macOS)
+        #if os(macOS)
+        installDefaultOutputDeviceListenerIfNeeded()
+        #endif
+        
+        // Observe AVAudioSession route changes (iOS/iPadOS)
+        #if os(iOS)
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] _ in
+            self?.restartAudioEngineAfterChange(reason: "AVAudioSessionRouteChange")
+        }
+        #endif
     }
     
     deinit {
@@ -104,10 +152,31 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             Log("Could not load instrument: \(error.localizedDescription)")
         }
     }
+    
+    /// Force-reload the instrument SoundFont on the sampler. Useful after engine/device changes.
+    private func reloadInstrument() {
+        do {
+            if let url = Bundle.main.url(forResource: "Sounds/YDP-GrandPiano", withExtension: "sf2") {
+                try instrument.loadInstrument(url: url)
+                instrumentLoaded = true
+                Log("Reloaded instrument successfully after device/engine change")
+            } else {
+                Log("Could not find SoundFont file during reload")
+            }
+        } catch {
+            Log("Could not reload instrument: \(error.localizedDescription)")
+        }
+    }
 
     func start() {
+        // Ensure audio session allows AirPlay/HomePod routing on iPad
+        #if os(iOS)
+        configureAudioSessionForPlayback()
+        #endif
+
         // Ensure instrument is loaded (idempotent)
         loadInstrument()
+        // Ensure correct preset applied even if engine was reconfigured earlier
         
         Log("🎵 Opening MIDI inputs...")
         midi.openInput(name: "Bluetooth")
@@ -198,6 +267,104 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         }
         noteOnTimestamps.removeAll()
     }
+    
+    @objc private func handleEngineConfigurationChange(_ note: Notification) {
+        restartAudioEngineAfterChange(reason: "AVAudioEngineConfigurationChange")
+    }
+
+    private func restartAudioEngineAfterChange(reason: String) {
+        Log("Audio: restarting engine due to \(reason)")
+        do {
+            // Stop the engine if it's currently running. AudioKit's AudioEngine doesn't expose `isRunning`,
+            // so prefer checking the underlying AVAudioEngine when available, otherwise use our own flag.
+            let currentlyRunning: Bool
+            #if canImport(AVFAudio)
+            currentlyRunning = engine.avEngine.isRunning
+            #else
+            currentlyRunning = engineStarted
+            #endif
+            if currentlyRunning {
+                engine.stop()
+                engineStarted = false
+            }
+            // Ensure instrument remains loaded and connected
+            loadInstrument()
+            engine.output = instrument
+
+            // Force-reload the sampler's SoundFont; route changes can drop the loaded preset
+            reloadInstrument()
+
+            #if os(macOS)
+            // Rebind output AU to current default device if possible
+            if let outputAU = engine.avEngine.outputNode.audioUnit {
+                var deviceID = getCurrentDefaultOutputDeviceID()
+                var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+                let status = AudioUnitSetProperty(
+                    outputAU,
+                    kAudioOutputUnitProperty_CurrentDevice,
+                    kAudioUnitScope_Global,
+                    0,
+                    &deviceID,
+                    size
+                )
+                if status != noErr {
+                    Log("Audio: failed to set current device on output AU: \(status)")
+                }
+            }
+            #endif
+
+            try engine.start()
+            engineStarted = true
+            Log("Audio: engine restarted successfully")
+        } catch {
+            Log("Audio: failed to restart engine: \(error)")
+        }
+    }
+
+    #if os(macOS)
+    private func installDefaultOutputDeviceListenerIfNeeded() {
+        guard !defaultDeviceListenerInstalled else { return }
+
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let systemObject = AudioObjectID(kAudioObjectSystemObject)
+        let status = AudioObjectAddPropertyListenerBlock(systemObject, &addr, DispatchQueue.main) { [weak self] _, _ in
+            self?.restartAudioEngineAfterChange(reason: "DefaultOutputDeviceChanged")
+        }
+
+        if status == noErr {
+            defaultDeviceListenerInstalled = true
+        } else {
+            Log("Audio: failed to install default output device listener: \(status)")
+        }
+    }
+
+    private func getCurrentDefaultOutputDeviceID() -> AudioDeviceID {
+        var deviceID = kAudioObjectUnknown
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &addr,
+            0,
+            nil,
+            &size,
+            &deviceID
+        )
+        if status != noErr {
+            Log("Audio: failed to query default output device: \(status)")
+        }
+        return deviceID
+    }
+    #endif
 
     func receivedMIDINoteOn(noteNumber: MIDINoteNumber,
                             velocity: MIDIVelocity,
@@ -475,11 +642,16 @@ struct ContentView: View {
   let flatText = MusicSymbol.flatSymbol.text()
   let naturalText = MusicSymbol.naturalSymbol.text()
   
+  let braceText = MusicSymbol.brace.text()
+  let barlineText = MusicSymbol.barline.text()
+  
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
   
   @StateObject private var vm = StaffViewModel()
   @EnvironmentObject private var conductor: MIDIMonitorConductor
+  @EnvironmentObject private var bluetoothManager: BluetoothMIDIManager
+  
   // Removed: @State private var advanceWorkItem: DispatchWorkItem?
   // Removed: private let autoAdvanceDebounce: TimeInterval = 0.25
   
@@ -773,6 +945,60 @@ struct ContentView: View {
               context.draw(trebleStaff, at: trebleStaffPoint)
               context.draw(bassStaff, at: bassStaffPoint)
               
+              // Draw brace and barline to connect the two staffs
+              // Calculate exact Y positions: top of treble staff to bottom of bass staff
+              let trebleYs = vm.staffLineYs(for: .treble)
+              let bassYs = vm.staffLineYs(for: .bass)
+              let topY = trebleYs.first ?? trebleStaffPoint.y // Top line of treble staff
+              let bottomY = bassYs.last ?? bassStaffPoint.y   // Bottom line of bass staff
+              
+              // Shift the center point down to align top with treble and bottom with bass
+              let braceMidY = (topY + bottomY) / 2 + 66 // Shift down by 66 points (nudged up 1 point from 67)
+              
+              let staffLeftEdge = noteX - 120
+              
+              // Save the context state before transforming
+              var braceContext = context
+              var barlineContext = context
+              
+              // Position the barline further left so it doesn't overlap the staff lines
+              let barlineX = staffLeftEdge - 3 // Move barline 3 points to the left of staff edge
+              
+              // Draw the vertical barline with vertical scaling only
+              braceContext.translateBy(x: barlineX, y: braceMidY)
+              braceContext.scaleBy(x: 1.0, y: 1.31) // Stretch vertically by 1.31x (fine-tuned)
+              braceContext.translateBy(x: -barlineX, y: -braceMidY)
+              let barlinePoint = CGPoint(x: barlineX, y: braceMidY)
+              braceContext.draw(barlineText, at: barlinePoint, anchor: .center)
+              
+              // Draw the brace with vertical scaling only
+              let braceX = barlineX - 7 // Position brace to the left of the barline
+              barlineContext.translateBy(x: braceX, y: braceMidY)
+              barlineContext.scaleBy(x: 1.0, y: 1.31) // Stretch vertically by 1.31x (fine-tuned)
+              barlineContext.translateBy(x: -braceX, y: -braceMidY)
+              let bracePoint = CGPoint(x: braceX, y: braceMidY)
+              barlineContext.draw(braceText, at: bracePoint, anchor: .center)
+              
+              // Draw the right barline at the edge of the staff (no gap)
+              let staffRightEdge = noteX + 120 // Right edge of staff glyph
+              
+              // Draw right barline (scaled to match left barline, slightly wider to cover bass staff overhang)
+              // The staff lines themselves end well before the glyph edge, so move significantly left
+              var rightBarlineContext = context
+                let rightBarlineX = staffRightEdge - 18 // Position to align with staff line endings
+              rightBarlineContext.translateBy(x: rightBarlineX, y: braceMidY)
+              rightBarlineContext.scaleBy(x: 1.18, y: 1.315) // Scale horizontally by 1.15x to cover bass staff overhang, vertically by 1.31x
+              rightBarlineContext.translateBy(x: -rightBarlineX, y: -braceMidY)
+              rightBarlineContext.draw(barlineText, at: CGPoint(x: rightBarlineX, y: braceMidY), anchor: .center)
+              
+              // Draw thin barline at right edge - 24
+              var thinBarlineContext = context
+              let thinBarlineX = staffRightEdge - 24
+              thinBarlineContext.translateBy(x: thinBarlineX, y: braceMidY)
+              thinBarlineContext.scaleBy(x: 0.4, y: 1.305) // Scale horizontally to 0.4x (about 1/3 thickness), vertically by 1.305x (reduced from 1.315)
+              thinBarlineContext.translateBy(x: -thinBarlineX, y: -braceMidY)
+              thinBarlineContext.draw(barlineText, at: CGPoint(x: thinBarlineX, y: braceMidY), anchor: .center)
+              
               if showDebugOverlays {
                 // Draw staff line guides (green) for both staffs
                 let stroke: CGFloat = 0.5
@@ -850,17 +1076,23 @@ struct ContentView: View {
               if appData.showHints {
                 Text("Clef:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(vm.currentClef == .treble ? "Treble" : "Bass")
                   .font(Platform.labelFont)
                   .frame(minWidth: Platform.clefWidth, alignment: .leading)
                 Text("Note:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(vm.currentNote.name)
                   .font(Platform.labelFont)
                   .monospaced()
                   .frame(minWidth: Platform.noteWidth, alignment: .leading)
                 Text("MIDI:")
                   .font(Platform.labelFont)
+                  .fontWeight(.semibold)
+                  .fixedSize()
                 Text(String(vm.currentNote.midi))
                   .font(Platform.labelFont)
                   .monospaced()
@@ -895,17 +1127,14 @@ struct ContentView: View {
               
               Text("Received Note:")
                 .font(Platform.labelFont)
-              Text(noteName(from: conductor.data.noteOn))
-                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.noteWidth, alignment: .leading)
               
               Text("Received MIDI:")
                 .font(Platform.labelFont)
-              Text(String(conductor.data.noteOn))
-                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.midiWidth, alignment: .leading)
+                Text(String(conductor.data.noteOn))
               
               Spacer()
             }
@@ -1037,7 +1266,7 @@ struct ContentView: View {
             case .history:
               PracticeHistoryView(navigationPath: $navigationPath)
             case .midiSettings:
-              MIDIDeviceSettingsView(bluetoothManager: conductor.bluetoothManager, conductor: conductor)
+              MIDIDeviceSettingsView(bluetoothManager: bluetoothManager, conductor: conductor)
           }
         }
         .sheet(isPresented: $showingResults) {
@@ -1129,12 +1358,19 @@ struct ContentView: View {
         // Right-aligned controls
         HStack(spacing: 8) {
           // Show Bluetooth indicator if connected
-          if conductor.bluetoothManager.hasBluetoothDevice {
+          if bluetoothManager.hasBluetoothDevice {
             Image(systemName: "antenna.radiowaves.left.and.right")
               .foregroundStyle(.blue)
               .font(.caption)
               .help("Bluetooth MIDI device connected")
           }
+          
+          #if os(iOS)
+          // AirPlay route picker for selecting HomePod and other AirPlay targets on iPad
+          AirPlayRoutePicker()
+            .frame(width: 32, height: 32)
+            .help("Select AirPlay output")
+          #endif
           
           Text(calibrationDisplayText)
             .font(Platform.calibrationFont)
@@ -1225,29 +1461,47 @@ struct ContentView: View {
   #Preview("Whole") {
     let data = AppData()
     data.noteHeadStyle = .whole
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
   
   #Preview("Half") {
     let data = AppData()
     data.noteHeadStyle = .half
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
   
   #Preview("Quarter") {
     let data = AppData()
     data.noteHeadStyle = .quarter
+    let conductor = MIDIMonitorConductor()
     return ContentView()
       .environmentObject(data)
-      .environmentObject(MIDIMonitorConductor())
+      .environmentObject(conductor)
+      .environmentObject(conductor.bluetoothManager)
       .frame(width: 900, height: 900)
   }
+
+#if os(iOS)
+import AVKit
+struct AirPlayRoutePicker: UIViewRepresentable {
+  func makeUIView(context: Context) -> AVRoutePickerView {
+    let view = AVRoutePickerView()
+    view.prioritizesVideoDevices = false
+    return view
+  }
+  func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+#endif
 
 // MARK: - Custom Wheel Picker (Works on both platforms)
 struct CustomNumberPicker: View {
@@ -1432,5 +1686,4 @@ private extension View {
     }
   }
 }
-
 

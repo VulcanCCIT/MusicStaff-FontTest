@@ -27,6 +27,8 @@ enum MusicSymbol {
   case sharpSymbol
   case naturalSymbol
   case flatSymbol
+  case brace
+  case barline
   
 
   var codepoint: String {
@@ -51,6 +53,10 @@ enum MusicSymbol {
         return "\u{E261}"
       case .sharpSymbol:
         return "\u{E262}"
+      case .brace:
+        return "\u{E000}"
+      case .barline:
+        return "\u{E030}"
   }
   }
 
@@ -58,7 +64,7 @@ enum MusicSymbol {
     switch self {
       case .bassStaff, .trebleStaff:
       return "MusGlyphs"
-      case .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown, .flatSymbol, .naturalSymbol, .sharpSymbol:
+      case .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown, .flatSymbol, .naturalSymbol, .sharpSymbol, .brace, .barline:
       return "Bravura"
     }
   }
@@ -69,6 +75,10 @@ enum MusicSymbol {
       return 70 //was 60
       case .wholeNote, .halfNoteUP, .halfNoteDown, .quarterNoteUP, .quarterNoteDown, .flatSymbol, .naturalSymbol, .sharpSymbol:
       return 40
+      case .brace:
+      return 100 // Thinner base size
+      case .barline:
+      return 100 // Thinner base size
     }
   }
 

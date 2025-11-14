@@ -33,6 +33,7 @@ struct MusicStaff_FontTestApp: App {
             ContentView()
                 .environmentObject(appData)
                 .environmentObject(conductor)
+                .environmentObject(conductor.bluetoothManager)
                 .onAppear {
                     // Ensure conductor is started when the app launches
                     conductor.start()
@@ -41,3 +42,4 @@ struct MusicStaff_FontTestApp: App {
         .modelContainer(sharedModelContainer)
     }
 }
+
