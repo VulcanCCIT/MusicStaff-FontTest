@@ -642,6 +642,9 @@ struct ContentView: View {
   let flatText = MusicSymbol.flatSymbol.text()
   let naturalText = MusicSymbol.naturalSymbol.text()
   
+  let braceText = MusicSymbol.brace.text()
+  let barlineText = MusicSymbol.barline.text()
+  
   let sharedX: CGFloat = 166
   let noteX: CGFloat = 166
   
@@ -941,6 +944,40 @@ struct ContentView: View {
               // Draw both staffs
               context.draw(trebleStaff, at: trebleStaffPoint)
               context.draw(bassStaff, at: bassStaffPoint)
+              
+              // Draw brace and barline to connect the two staffs
+              // Calculate exact Y positions: top of treble staff to bottom of bass staff
+              let trebleYs = vm.staffLineYs(for: .treble)
+              let bassYs = vm.staffLineYs(for: .bass)
+              let topY = trebleYs.first ?? trebleStaffPoint.y // Top line of treble staff
+              let bottomY = bassYs.last ?? bassStaffPoint.y   // Bottom line of bass staff
+              
+              // Shift the center point down to align top with treble and bottom with bass
+              let braceMidY = (topY + bottomY) / 2 + 67 // Shift down by 67 points (reduced from 69)
+              
+              let staffLeftEdge = noteX - 120
+              
+              // Save the context state before transforming
+              var braceContext = context
+              var barlineContext = context
+              
+              // Position the barline further left so it doesn't overlap the staff lines
+              let barlineX = staffLeftEdge - 3 // Move barline 3 points to the left of staff edge
+              
+              // Draw the vertical barline with vertical scaling only
+              braceContext.translateBy(x: barlineX, y: braceMidY)
+              braceContext.scaleBy(x: 1.0, y: 1.31) // Stretch vertically by 1.31x (fine-tuned)
+              braceContext.translateBy(x: -barlineX, y: -braceMidY)
+              let barlinePoint = CGPoint(x: barlineX, y: braceMidY)
+              braceContext.draw(barlineText, at: barlinePoint, anchor: .center)
+              
+              // Draw the brace with vertical scaling only
+              let braceX = barlineX - 7 // Position brace to the left of the barline
+              barlineContext.translateBy(x: braceX, y: braceMidY)
+              barlineContext.scaleBy(x: 1.0, y: 1.30) // Stretch vertically by 1.31x (fine-tuned)
+              barlineContext.translateBy(x: -braceX, y: -braceMidY)
+              let bracePoint = CGPoint(x: braceX, y: braceMidY)
+              barlineContext.draw(braceText, at: bracePoint, anchor: .center)
               
               if showDebugOverlays {
                 // Draw staff line guides (green) for both staffs
