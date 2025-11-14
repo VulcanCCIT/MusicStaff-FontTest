@@ -953,7 +953,7 @@ struct ContentView: View {
               let bottomY = bassYs.last ?? bassStaffPoint.y   // Bottom line of bass staff
               
               // Shift the center point down to align top with treble and bottom with bass
-              let braceMidY = (topY + bottomY) / 2 + 67 // Shift down by 67 points (reduced from 69)
+              let braceMidY = (topY + bottomY) / 2 + 66 // Shift down by 66 points (nudged up 1 point from 67)
               
               let staffLeftEdge = noteX - 120
               
@@ -974,10 +974,30 @@ struct ContentView: View {
               // Draw the brace with vertical scaling only
               let braceX = barlineX - 7 // Position brace to the left of the barline
               barlineContext.translateBy(x: braceX, y: braceMidY)
-              barlineContext.scaleBy(x: 1.0, y: 1.30) // Stretch vertically by 1.31x (fine-tuned)
+              barlineContext.scaleBy(x: 1.0, y: 1.31) // Stretch vertically by 1.31x (fine-tuned)
               barlineContext.translateBy(x: -braceX, y: -braceMidY)
               let bracePoint = CGPoint(x: braceX, y: braceMidY)
               barlineContext.draw(braceText, at: bracePoint, anchor: .center)
+              
+              // Draw the right barline at the edge of the staff (no gap)
+              let staffRightEdge = noteX + 120 // Right edge of staff glyph
+              
+              // Draw right barline (scaled to match left barline, slightly wider to cover bass staff overhang)
+              // The staff lines themselves end well before the glyph edge, so move significantly left
+              var rightBarlineContext = context
+                let rightBarlineX = staffRightEdge - 18 // Position to align with staff line endings
+              rightBarlineContext.translateBy(x: rightBarlineX, y: braceMidY)
+              rightBarlineContext.scaleBy(x: 1.18, y: 1.315) // Scale horizontally by 1.15x to cover bass staff overhang, vertically by 1.31x
+              rightBarlineContext.translateBy(x: -rightBarlineX, y: -braceMidY)
+              rightBarlineContext.draw(barlineText, at: CGPoint(x: rightBarlineX, y: braceMidY), anchor: .center)
+              
+              // Draw thin barline at right edge - 24
+              var thinBarlineContext = context
+              let thinBarlineX = staffRightEdge - 24
+              thinBarlineContext.translateBy(x: thinBarlineX, y: braceMidY)
+              thinBarlineContext.scaleBy(x: 0.4, y: 1.305) // Scale horizontally to 0.4x (about 1/3 thickness), vertically by 1.305x (reduced from 1.315)
+              thinBarlineContext.translateBy(x: -thinBarlineX, y: -braceMidY)
+              thinBarlineContext.draw(barlineText, at: CGPoint(x: thinBarlineX, y: braceMidY), anchor: .center)
               
               if showDebugOverlays {
                 // Draw staff line guides (green) for both staffs
