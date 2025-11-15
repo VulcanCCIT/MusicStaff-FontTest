@@ -100,14 +100,17 @@ struct KeyBoardView: View {
             KnobImage()
             Spacer()
             
-            ZStack(alignment: .topTrailing) {
+            HStack(spacing: 24) {
               KnobImage()
+              KnobImage()
+            }
+            .overlay(alignment: .top) {
               Image("redled2")
                 .resizable()
                 .interpolation(.high)
                 .antialiased(true)
                 .frame(width: 30, height: 30)
-                .offset(x: 20, y: -12)
+                .offset(x: 0, y: -12) // Centered between the two knobs
                 .accessibilityHidden(true)
             }
           }

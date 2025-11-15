@@ -1126,20 +1126,26 @@ struct ContentView: View {
               
               Text("Received Clef:")
                 .font(Platform.labelFont)
+                .fixedSize()
               Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
                 .font(Platform.labelFont)
                 .frame(minWidth: Platform.clefWidth, alignment: .leading)
               
               Text("Received Note:")
                 .font(Platform.labelFont)
+                .fixedSize()
+              Text(conductor.data.noteOn == 0 ? "—" : noteName(from: conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.noteWidth, alignment: .leading)
               
               Text("Received MIDI:")
                 .font(Platform.labelFont)
+                .fixedSize()
+              Text(String(conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.midiWidth, alignment: .leading)
-                Text(String(conductor.data.noteOn))
               
               Spacer()
             }
