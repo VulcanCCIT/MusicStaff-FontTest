@@ -10,5 +10,14 @@
 		<string>MusGlyphs-Text.otf</string>
 		<string>MusGlyphs-TextBold.otf</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>RedBackground</string>
+		<key>UIImageName</key>
+		<string>Launch</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

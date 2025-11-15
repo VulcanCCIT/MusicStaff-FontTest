@@ -150,10 +150,10 @@ struct KeyBoardView: View {
           #if os(macOS)
           let responsiveHeight = idealHeight.clamped(to: 170...350)
           #else
-          // iPad needs much smaller keyboard when docked to avoid clipping
-          let dockedScaleFactor: CGFloat = docked ? 0.65 : 1.0 // 35% smaller when docked
+          // iPad can now have a much larger keyboard in docked mode with proper safe areas
+          let dockedScaleFactor: CGFloat = docked ? 1.05 : 1.0 // Actually 5% LARGER when docked to fill space
           let scaledIdealHeight = idealHeight * dockedScaleFactor
-          let responsiveHeight = scaledIdealHeight.clamped(to: 120...180)
+          let responsiveHeight = scaledIdealHeight.clamped(to: 220...340) // Even larger range
           #endif
           
           ZStack {
@@ -211,13 +211,13 @@ struct KeyBoardView: View {
         #if os(macOS)
         .frame(minHeight: 170)
         #else
-        .frame(minHeight: docked ? 120 : 140, maxHeight: docked ? 180 : 220) // Much smaller when docked on iPad
+        .frame(minHeight: docked ? 220 : 140, maxHeight: docked ? 340 : 220) // Even larger when docked on iPad
         #endif
         #if os(macOS)
         .padding(.bottom, docked ? 0 : 40)
         #else
-        // iPad bottom padding for comfortable spacing
-        .padding(.bottom, docked ? 38 : 40)
+        // iPad bottom padding - minimal when docked since safe area handles it
+        .padding(.bottom, docked ? 8 : 40)
         #endif
       }
       .background(
@@ -230,10 +230,6 @@ struct KeyBoardView: View {
                   .frame(height: 1)
           }
       }
-      #if os(iOS)
-      // Critical: Add safe area padding at the bottom on iPad to prevent clipping
-      .safeAreaPadding(.bottom, docked ? 140 : 0) // Increased to 60 for comfortable spacing from iPad edge
-      #endif
       .clipShape(
         UnevenRoundedRectangle(
           topLeadingRadius: 18,

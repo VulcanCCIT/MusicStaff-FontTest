@@ -908,7 +908,7 @@ struct ContentView: View {
             #if os(macOS)
             .frame(width: 115, height: 155)
             #else
-            .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+            .frame(width: 135, height: 180) // Larger on iPad with more space available
             #endif
             .padding(.top, 40) // Center vertically with staff
             
@@ -931,9 +931,9 @@ struct ContentView: View {
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
               #else
-              // iPad: more aggressive scaling due to limited space
-              let scale: CGFloat = 0.70 // Scale down by 30% on iPad to accommodate full 88-key range
-              let verticalShift: CGFloat = 10 // Shift staff down by 10 points to give more clearance at top
+              // iPad: larger staff now that we have more room
+              let scale: CGFloat = 0.82 // Less scaling means larger staff (was 0.70)
+              let verticalShift: CGFloat = 12 // Shift staff down by 12 points to give clearance at top
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
@@ -1068,7 +1068,7 @@ struct ContentView: View {
             #if os(macOS)
             .frame(height: 320) // Mac: increased from 280 to give more room for extreme notes
             #else
-            .frame(height: 280) // iPad: keep at 280
+            .frame(height: 340) // iPad: larger to match bigger layout
             #endif
             .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
@@ -1161,7 +1161,7 @@ struct ContentView: View {
           #if os(macOS)
           .frame(width: 115, height: 155)
           #else
-          .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+          .frame(width: 135, height: 180) // Larger on iPad with more space available
           #endif
           .padding(.top, 40) // Center vertically with staff
           
@@ -1422,7 +1422,7 @@ struct ContentView: View {
         }
       }
     }
-    .padding(.top, Platform.isMac ? 16 : 135)
+    .padding(.top, Platform.isMac ? 16 : 8)
     .padding(.horizontal, Platform.horizontalPadding)
     .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
