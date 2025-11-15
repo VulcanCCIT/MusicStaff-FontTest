@@ -891,7 +891,7 @@ struct ContentView: View {
           midiReceivedIndicator
           
           Spacer()
-            .frame(height: 25)
+            .frame(height: 20)
           
           // Removed inline KeyBoardView here per instructions
           
@@ -1406,7 +1406,7 @@ struct ContentView: View {
         }
       }
     }
-    .padding(.top, Platform.isMac ? 16 : 90)
+    .padding(.top, Platform.isMac ? 16 : 135)
     .padding(.horizontal, Platform.horizontalPadding)
     .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
