@@ -900,12 +900,17 @@ struct ContentView: View {
             Spacer()
               .frame(maxWidth: 120)
             
-            // Left speaker - aligned to top
+            // Left speaker - centered with staff
             SpeakerView(
               isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
               velocity: conductor.data.velocity
             )
+            #if os(macOS)
             .frame(width: 115, height: 155)
+            #else
+            .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+            #endif
+            .padding(.top, 40) // Center vertically with staff
             
             Spacer()
             
@@ -1142,12 +1147,17 @@ struct ContentView: View {
           
           Spacer()
           
-          // Right speaker - aligned to top
+          // Right speaker - centered with staff
           SpeakerView(
             isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
             velocity: conductor.data.velocity
           )
+          #if os(macOS)
           .frame(width: 115, height: 155)
+          #else
+          .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+          #endif
+          .padding(.top, 40) // Center vertically with staff
           
           Spacer()
             .frame(maxWidth: 120)

@@ -159,9 +159,10 @@ struct CalibrationWizardView: View {
 
     // Manual calibration state
     @State private var selectedSize: Int = 61
-    private let manualSizes: [Int] = [37, 49, 61, 76, 88]
+    private let manualSizes: [Int] = [25, 37, 49, 61, 76, 88]
 
     private let sizeToStandardRange: [Int: ClosedRange<Int>] = [
+        25: 48...72,   // C3–C5 (2 octaves)
         37: 36...72,   // C2–C5
         49: 36...84,   // C2–C6
         61: 36...96,   // C2–C7
