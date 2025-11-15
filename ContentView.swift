@@ -891,7 +891,7 @@ struct ContentView: View {
           midiReceivedIndicator
           
           Spacer()
-            .frame(height: 25)
+            .frame(height: 20)
           
           // Removed inline KeyBoardView here per instructions
           
@@ -900,12 +900,17 @@ struct ContentView: View {
             Spacer()
               .frame(maxWidth: 120)
             
-            // Left speaker - aligned to top
+            // Left speaker - centered with staff
             SpeakerView(
               isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
               velocity: conductor.data.velocity
             )
+            #if os(macOS)
             .frame(width: 115, height: 155)
+            #else
+            .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+            #endif
+            .padding(.top, 40) // Center vertically with staff
             
             Spacer()
             
@@ -1121,20 +1126,26 @@ struct ContentView: View {
               
               Text("Received Clef:")
                 .font(Platform.labelFont)
+                .fixedSize()
               Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
                 .font(Platform.labelFont)
                 .frame(minWidth: Platform.clefWidth, alignment: .leading)
               
               Text("Received Note:")
                 .font(Platform.labelFont)
+                .fixedSize()
+              Text(conductor.data.noteOn == 0 ? "—" : noteName(from: conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.noteWidth, alignment: .leading)
               
               Text("Received MIDI:")
                 .font(Platform.labelFont)
+                .fixedSize()
+              Text(String(conductor.data.noteOn))
+                .font(Platform.labelFont)
                 .monospaced()
                 .frame(minWidth: Platform.midiWidth, alignment: .leading)
-                Text(String(conductor.data.noteOn))
               
               Spacer()
             }
@@ -1142,12 +1153,17 @@ struct ContentView: View {
           
           Spacer()
           
-          // Right speaker - aligned to top
+          // Right speaker - centered with staff
           SpeakerView(
             isPlaying: conductor.isShowingMIDIReceived && conductor.data.velocity > 0,
             velocity: conductor.data.velocity
           )
+          #if os(macOS)
           .frame(width: 115, height: 155)
+          #else
+          .frame(width: 95, height: 125) // Smaller on iPad to prevent touching menu bar
+          #endif
+          .padding(.top, 40) // Center vertically with staff
           
           Spacer()
             .frame(maxWidth: 120)
@@ -1406,7 +1422,7 @@ struct ContentView: View {
         }
       }
     }
-    .padding(.top, Platform.isMac ? 16 : 90)
+    .padding(.top, Platform.isMac ? 16 : 135)
     .padding(.horizontal, Platform.horizontalPadding)
     .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)

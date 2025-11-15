@@ -100,27 +100,30 @@ struct KeyBoardView: View {
             KnobImage()
             Spacer()
             
-            ZStack(alignment: .topTrailing) {
+            HStack(spacing: 24) {
               KnobImage()
+              KnobImage()
+            }
+            .overlay(alignment: .top) {
               Image("redled2")
                 .resizable()
                 .interpolation(.high)
                 .antialiased(true)
-                .frame(width: 36, height: 36)
-                .offset(x: 22, y: -17)
+                .frame(width: 30, height: 30)
+                .offset(x: 0, y: -12) // Centered between the two knobs
                 .accessibilityHidden(true)
             }
           }
         }
         .overlay(alignment: .center) {
           NodeOutputView(conductor.instrument, color: .red)
-            .frame(height: 52)
-            .frame(width: 260)
+            .frame(height: 42)
+            .frame(width: 220)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(GlassReflection(cornerRadius: 8))
             .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, 8) //3DPanel Padding
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
         .background(
@@ -229,7 +232,7 @@ struct KeyBoardView: View {
       }
       #if os(iOS)
       // Critical: Add safe area padding at the bottom on iPad to prevent clipping
-      .safeAreaPadding(.bottom, docked ? 60 : 0) // Increased to 60 for comfortable spacing from iPad edge
+      .safeAreaPadding(.bottom, docked ? 140 : 0) // Increased to 60 for comfortable spacing from iPad edge
       #endif
       .clipShape(
         UnevenRoundedRectangle(
@@ -303,7 +306,7 @@ struct KnobImage: View {
       #endif
     }
     .aspectRatio(1, contentMode: .fit)
-    .frame(width: 46, height: 46)
+    .frame(width: 38, height: 38)
     .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
     .accessibilityHidden(true)
   }
