@@ -117,13 +117,13 @@ struct KeyBoardView: View {
         }
         .overlay(alignment: .center) {
           NodeOutputView(conductor.instrument, color: .red)
-            .frame(height: 42)
-            .frame(width: 220)
+            .frame(height: 68)
+            .frame(width: 240)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(GlassReflection(cornerRadius: 8))
             .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
         }
-        .padding(.vertical, 8) //3DPanel Padding
+        .padding(.vertical, 20) //3DPanel Padding - increased for better proportions
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
         .background(
@@ -217,7 +217,7 @@ struct KeyBoardView: View {
         .padding(.bottom, docked ? 0 : 40)
         #else
         // iPad bottom padding - minimal when docked since safe area handles it
-        .padding(.bottom, docked ? 8 : 40)
+        .padding(.bottom, docked ? 3 : 5)
         #endif
       }
       .background(
