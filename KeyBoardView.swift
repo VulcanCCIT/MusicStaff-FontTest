@@ -139,85 +139,60 @@ struct KeyBoardView: View {
           .padding(.top, -8)
           .padding(.bottom, 8)
 
-        // 3D Keyboard View
-        GeometryReader { proxy in
-          let whiteCount = max(1, (lowNote...highNote).filter { ![1,3,6,8,10].contains($0 % 12) }.count)
-          let keyWidth = proxy.size.width / CGFloat(whiteCount)
-          let lengthFactor: CGFloat = 5.6
-          let idealHeight = keyWidth * lengthFactor
-          
-          // Platform-specific and docked-mode-aware height calculation
-          #if os(macOS)
-          let responsiveHeight = idealHeight.clamped(to: 170...350)
-          #else
-          // iPad can now have a much larger keyboard in docked mode with proper safe areas
-          let dockedScaleFactor: CGFloat = docked ? 1.05 : 1.0 // Actually 5% LARGER when docked to fill space
-          let scaledIdealHeight = idealHeight * dockedScaleFactor
-          let responsiveHeight = scaledIdealHeight.clamped(to: 220...340) // Even larger range
-          #endif
-          
-          ZStack {
-            Keyboard3DView(
-              lowNote: lowNote,
-              highNote: highNote,
-              conductor: conductor,
-              isCorrect: isCorrect,
-              pressedCorrectness: $pressedCorrectness,
-              externalVelocities: $externalVelocities,
-              scientificLabel: scientificLabel,
-              showHints: appData.showHints
-            )
-            .frame(height: responsiveHeight)
-          }
-          .padding(.horizontal, 8) // thinner left/right bezel
-          .padding(.bottom, 24) // Increased bottom padding to prevent label/key clipping
-          .background(
-            // Add the same styled background
-            ZStack {
-              // Unified chassis color to match the top panel
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color("MeterPanelColor"))
-
-              // Subtle vertical sheen similar to Panel3DBackground
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
-                .blendMode(.softLight)
-
-              // Add subtle purple tint to match design language (reduced intensity) 
-              RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .blendMode(.plusLighter)
-            }//bluezstack
+        // 3D Keyboard View - Simplified container with no complex height calculations
+        ZStack {
+          Keyboard3DView(
+            lowNote: lowNote,
+            highNote: highNote,
+            conductor: conductor,
+            isCorrect: isCorrect,
+            pressedCorrectness: $pressedCorrectness,
+            externalVelocities: $externalVelocities,
+            scientificLabel: scientificLabel,
+            showHints: appData.showHints
           )
-          .overlay(
-            // Edge highlight
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-              .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-              .blendMode(.overlay)
-          )
-          .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-              .stroke(
-                LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1
-              )
-              .blendMode(.screen)
-              .opacity(0.9)
-          )
-          .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
-          .frame(height: responsiveHeight)
         }
+        .padding(.horizontal, 12) // Minimal side padding
+        .padding(.vertical, 12) // Minimal top/bottom padding
+        .background(
+          // Simplified styled background
+          ZStack {
+            // Unified chassis color to match the top panel
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .fill(Color("MeterPanelColor"))
+
+            // Subtle vertical sheen similar to Panel3DBackground
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear, Color.black.opacity(0.08)], startPoint: .top, endPoint: .bottom))
+              .blendMode(.softLight)
+
+            // Add subtle purple tint to match design language (reduced intensity) 
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+              .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+              .blendMode(.plusLighter)
+          }
+        )
+        .overlay(
+          // Edge highlight
+          RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(LinearGradient(colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+            .blendMode(.overlay)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .stroke(
+              LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.02), .clear],
+                             startPoint: .topLeading, endPoint: .bottomTrailing),
+              lineWidth: 1
+            )
+            .blendMode(.screen)
+            .opacity(0.9)
+        )
+        .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
         #if os(macOS)
-        .frame(minHeight: 170)
+        .padding(.bottom, docked ? 8 : 40)
         #else
-        .frame(minHeight: docked ? 220 : 140, maxHeight: docked ? 340 : 220) // Even larger when docked on iPad
-        #endif
-        #if os(macOS)
-        .padding(.bottom, docked ? 8 : 40) // Increased from 0 to 8 when docked
-        #else
-        // iPad bottom padding - increased to prevent clipping of labels and key fronts
-        .padding(.bottom, docked ? 12 : 12) // Increased from 3/5 to provide consistent clearance
+        .padding(.bottom, docked ? 12 : 12)
         #endif
       }
       .overlay(alignment: .top) {
@@ -628,23 +603,20 @@ struct Keyboard3DView: View {
         let blackFrontH = blackFrontHeight * s
         let caseH = caseHeight * s
         let elevation = blackKeyElevation * s
-        // Shadow variables removed - no longer needed
 
-        // Inserted bottom margin constant - platform specific to prevent clipping
-        // Increased to ensure labels and key fronts are never clipped
-        #if os(macOS)
-        let bottomMargin = max(40, whiteFrontH * 1.8) // Mac reserve - increased significantly
-        #else
-        let bottomMargin = max(50, whiteFrontH * 2.0) // iPad needs more reserve to prevent clipping
-        #endif
-
-        // Enhanced perspective for "sitting at keyboard" viewing angle
-        // Show more depth while still guaranteeing the white-key front faces are visible
-        let a: CGFloat = 0.25 / 0.75 // Increased relationship between keyboardY and depth for more dramatic angle
-        let preferredDepth = totalHeight // allow as much depth as available; clamp below prevents clipping
-        let maxDepthByHeight = max(80, (totalHeight - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
-        let keyboardDepth: CGFloat = min(preferredDepth, maxDepthByHeight)
-        let keyboardY = keyboardDepth * a // This positions the back edge higher up
+        // Calculate key width for reference
+        let whiteCount = max(1, (lowNote...highNote).filter { ![1,3,6,8,10].contains($0 % 12) }.count)
+        let keyWidth = totalWidth / CGFloat(whiteCount)
+        
+        // SIMPLIFIED LAYOUT CALCULATION
+        // Reserve space for labels at bottom - scale with key width
+        let labelReserve = min(25, whiteFrontH * 1.2)
+        
+        // Use a fixed perspective ratio that works for all keyboard sizes
+        let perspectiveRatio: CGFloat = 0.22 // How much height is "above" the keyboard
+        let usableHeight = totalHeight - labelReserve
+        let keyboardDepth = usableHeight * (1.0 - perspectiveRatio)
+        let keyboardY = usableHeight * perspectiveRatio
 
         // Keyboard case/background
         drawPerspectiveKeyboardCase(context: context, size: size, keyboardY: keyboardY, depth: keyboardDepth, caseHeight: caseH)
@@ -1081,22 +1053,13 @@ struct Keyboard3DView: View {
         
         let clampedX = min(max(location.x, 0), size.width - 0.0001)
         
-        // Mirror the drawing proportions and compute keyboardY from depth so hit-testing matches visuals
-        let a: CGFloat = 0.20 / 0.72
+        // SIMPLIFIED - Match the drawing code's layout calculation exactly
         let whiteFrontH = whiteFrontHeight * scaleFor(size: size)
-
-        // Inserted bottom margin constant - platform specific
-        // Increased to ensure labels and key fronts are never clipped
-        #if os(macOS)
-        let bottomMargin = max(40, whiteFrontH * 1.8) // Mac reserve - increased significantly
-        #else
-        let bottomMargin = max(50, whiteFrontH * 2.0) // iPad needs more reserve to prevent clipping
-        #endif
-
-        let preferredDepth = size.height // allow deeper keys; clamp below
-        let maxDepthByHeight = max(60, (size.height - whiteFrontH * frontFaceReserveFactor - bottomMargin - 2) / (1 + a))
-        let keyboardDepth = min(preferredDepth, maxDepthByHeight)
-        let keyboardY = keyboardDepth * a
+        let labelReserve = min(25, whiteFrontH * 1.2)
+        let perspectiveRatio: CGFloat = 0.22
+        let usableHeight = size.height - labelReserve
+        let keyboardDepth = usableHeight * (1.0 - perspectiveRatio)
+        let keyboardY = usableHeight * perspectiveRatio
 
         // White-only guard strip at the very front to avoid accidental black key hits
         let whiteOnlyGuardHeight = keyboardDepth * whiteFrontGuardRatio
