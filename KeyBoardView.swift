@@ -187,7 +187,7 @@ struct KeyBoardView: View {
               RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(LinearGradient(colors: [Color.purple.opacity(0.04), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .blendMode(.plusLighter)
-            }
+            }//bluezstack
           )
           .overlay(
             // Edge highlight
@@ -220,9 +220,6 @@ struct KeyBoardView: View {
         .padding(.bottom, docked ? 3 : 5)
         #endif
       }
-      .background(
-        docked ? Color.clear : (colorScheme == .dark ? Color.clear : Color("MeterPanelColor"))
-      )
       .overlay(alignment: .top) {
           if docked {
               Rectangle()
