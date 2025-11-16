@@ -170,7 +170,7 @@ struct KeyBoardView: View {
             .frame(height: responsiveHeight)
           }
           .padding(.horizontal, 8) // thinner left/right bezel
-          .padding(.bottom, 10)
+          .padding(.bottom, 24) // Increased bottom padding to prevent label/key clipping
           .background(
             // Add the same styled background
             ZStack {
@@ -214,10 +214,10 @@ struct KeyBoardView: View {
         .frame(minHeight: docked ? 220 : 140, maxHeight: docked ? 340 : 220) // Even larger when docked on iPad
         #endif
         #if os(macOS)
-        .padding(.bottom, docked ? 0 : 40)
+        .padding(.bottom, docked ? 8 : 40) // Increased from 0 to 8 when docked
         #else
-        // iPad bottom padding - minimal when docked since safe area handles it
-        .padding(.bottom, docked ? 3 : 5)
+        // iPad bottom padding - increased to prevent clipping of labels and key fronts
+        .padding(.bottom, docked ? 12 : 12) // Increased from 3/5 to provide consistent clearance
         #endif
       }
       .overlay(alignment: .top) {
@@ -631,10 +631,11 @@ struct Keyboard3DView: View {
         // Shadow variables removed - no longer needed
 
         // Inserted bottom margin constant - platform specific to prevent clipping
+        // Increased to ensure labels and key fronts are never clipped
         #if os(macOS)
-        let bottomMargin = max(16, whiteFrontH * 1.25) // Mac reserve
+        let bottomMargin = max(40, whiteFrontH * 1.8) // Mac reserve - increased significantly
         #else
-        let bottomMargin = max(32, whiteFrontH * 1.5) // iPad needs more reserve to prevent clipping
+        let bottomMargin = max(50, whiteFrontH * 2.0) // iPad needs more reserve to prevent clipping
         #endif
 
         // Enhanced perspective for "sitting at keyboard" viewing angle
@@ -906,8 +907,11 @@ struct Keyboard3DView: View {
         let blackKeyDepth = keyboardDepth * blackDepthRatio
         let elevationOffset: CGFloat = elevation
 
-        let keyStartY = keyboardY + elevationOffset + pressDepth
-        let keyEndY = keyboardY + blackKeyDepth + elevationOffset + pressDepth
+        // Black keys should align their back edge with white keys' back edge
+        // The elevation is negative (e.g., -8), which was lifting them UP too much
+        // We want them at the same back edge, just elevated slightly for 3D effect on the front face
+        let keyStartY = keyboardY + pressDepth // Start at same back edge as white keys
+        let keyEndY = keyStartY + blackKeyDepth // Black keys end earlier than white keys
         let keyHeight: CGFloat = blackFrontHeight
 
         // Keep black keys rectangular to avoid artifacts - only apply subtle scaling  
@@ -1082,10 +1086,11 @@ struct Keyboard3DView: View {
         let whiteFrontH = whiteFrontHeight * scaleFor(size: size)
 
         // Inserted bottom margin constant - platform specific
+        // Increased to ensure labels and key fronts are never clipped
         #if os(macOS)
-        let bottomMargin = max(16, whiteFrontH * 1.25) // Mac reserve
+        let bottomMargin = max(40, whiteFrontH * 1.8) // Mac reserve - increased significantly
         #else
-        let bottomMargin = max(32, whiteFrontH * 1.5) // iPad needs more reserve
+        let bottomMargin = max(50, whiteFrontH * 2.0) // iPad needs more reserve to prevent clipping
         #endif
 
         let preferredDepth = size.height // allow deeper keys; clamp below
@@ -1158,7 +1163,7 @@ struct Keyboard3DView: View {
     
     private func blackDepthRatio(for size: CGSize) -> CGFloat {
         let s = scaleFor(size: size) // ~0.6 ... 1.4
-        return 0.58 + 0.06 * min(max(s, 0.6), 1.0) // 0.58 ... 0.64
+        return 0.58 + 0.02 * min(max(s, 0.6), 1.0) // 0.58 ... 0.60 (realistic piano proportions)
     }
     
     private func isBlackKey(_ midi: Int) -> Bool {

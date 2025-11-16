@@ -923,17 +923,22 @@ struct ContentView: View {
               let originalGroupMidY = (trebleStaffPoint.y + bassStaffPoint.y) / 2 // 190 based on current anchors
               
               // Platform-specific scaling to accommodate full 88-key range with note tails
+              // Larger staff sizes that adapt to available screen space
               #if os(macOS)
-              // Mac: moderate scaling with increased canvas height
-              let scale: CGFloat = 0.78 // Scale down by 22% on Mac
-              let verticalShift: CGFloat = 15 // Shift staff down by 15 points for more top clearance
+              // Mac: adaptive scaling based on available width
+              let baseScale: CGFloat = 1.05 // Larger base scale (was 0.78)
+              let widthFactor = min(size.width / 800, 1.3) // Scale up to 30% larger on wide screens
+              let scale = baseScale * widthFactor
+              let verticalShift: CGFloat = 20 // Shift staff down for more top clearance
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
               #else
-              // iPad: larger staff now that we have more room
-              let scale: CGFloat = 0.82 // Less scaling means larger staff (was 0.70)
-              let verticalShift: CGFloat = 12 // Shift staff down by 12 points to give clearance at top
+              // iPad: larger staff with adaptive scaling based on screen size
+              let baseScale: CGFloat = 1.15 // Much larger base scale (was 0.82)
+              let widthFactor = min(size.width / 700, 1.4) // Scale up to 40% larger on wide iPads
+              let scale = baseScale * widthFactor
+              let verticalShift: CGFloat = 15 // Shift staff down to give clearance at top
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
@@ -1066,9 +1071,9 @@ struct ContentView: View {
               context.draw(noteText, at: notePoint, anchor: .center)
             }
             #if os(macOS)
-            .frame(height: 320) // Mac: increased from 280 to give more room for extreme notes
+            .frame(height: 400) // Mac: increased to accommodate larger staff (was 320)
             #else
-            .frame(height: 340) // iPad: larger to match bigger layout
+            .frame(height: 420) // iPad: increased to accommodate larger staff (was 340)
             #endif
             .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
