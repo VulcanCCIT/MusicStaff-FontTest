@@ -1213,7 +1213,7 @@ struct ContentView: View {
           }
           
           Spacer()
-            .frame(minHeight: 8, maxHeight: 20)
+            .frame(minHeight: 8, maxHeight: 20) //8 20
         } // VStack
         .safeAreaInset(edge: .bottom) {
           KeyBoardView(isCorrect: { midi in
