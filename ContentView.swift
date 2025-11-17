@@ -678,6 +678,18 @@ struct ContentView: View {
     clefMode: .random
   )
   
+  // Computed property to determine if we're in portrait orientation
+  private var isPortrait: Bool {
+    #if os(iOS)
+    // On iOS, check if height > width (portrait orientation)
+    let screenBounds = UIScreen.main.bounds
+    return screenBounds.height > screenBounds.width
+    #else
+    // On macOS, always use landscape layout
+    return false
+    #endif
+  }
+  
   // Removed isWaitingForNote and receivedBlankDelay
   
   // Staff drawing control (positions match your previous staff anchors)
@@ -843,7 +855,7 @@ struct ContentView: View {
   
   var body: some View {
     NavigationStack(path: $navigationPath) {
-      ZStack {
+      ZStack(alignment: isPortrait ? .top : .center) { // Align to top in portrait
         // Subtle, adaptive background (unified gradient for both light and dark modes)
         Group {
           LinearGradient(
@@ -891,14 +903,20 @@ struct ContentView: View {
           midiReceivedIndicator
           
           Spacer()
-            .frame(height: 20)
+            .frame(height: isPortrait ? 8 : 20) // Minimal spacing in portrait
+          
+          // In portrait, add large flexible spacer at top to push all content down
+          if isPortrait {
+            Spacer()
+              .frame(minHeight: 80, idealHeight: 200) // LARGE spacer at top - pushes everything down
+          }
           
           // Removed inline KeyBoardView here per instructions
           
           // Staff and note drawing with speakers
           HStack(alignment: .top, spacing: 0) {
             Spacer()
-              .frame(maxWidth: 120)
+              .frame(maxWidth: isPortrait ? 40 : 120) // Even more reduced side margins in portrait
             
             // Left speaker - centered with staff
             SpeakerView(
@@ -908,14 +926,19 @@ struct ContentView: View {
             #if os(macOS)
             .frame(width: 115, height: 155)
             #else
-            .frame(width: 135, height: 180) // Larger on iPad with more space available
+            .frame(width: isPortrait ? 150 : 135, height: isPortrait ? 200 : 180) // BIGGER speakers in portrait
             #endif
-            .padding(.top, 40) // Center vertically with staff
+            .padding(.top, isPortrait ? 12 : 40) // Very reduced top padding in portrait
             
-            Spacer()
+            if isPortrait {
+              Spacer()
+                .frame(maxWidth: 16) // Very compact spacer in portrait
+            } else {
+              Spacer()
+            }
             
             // Staff in the middle
-            VStack(spacing: 16) {
+            VStack(spacing: isPortrait ? 12 : 16) { // Spacing between staff and labels
               Canvas { context, size in
               // Center the entire staff/note drawing within the canvas
               let centerX = size.width / 2
@@ -934,11 +957,11 @@ struct ContentView: View {
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
               #else
-              // iPad: larger staff with adaptive scaling based on screen size
-              let baseScale: CGFloat = 1.15 // Much larger base scale (was 0.82)
+              // iPad: larger staff with adaptive scaling based on screen size and orientation
+              let baseScale: CGFloat = isPortrait ? 1.65 : 1.15 // Portrait: MUCH MUCH BIGGER (was 1.35), Landscape: same
               let widthFactor = min(size.width / 700, 1.4) // Scale up to 40% larger on wide iPads
               let scale = baseScale * widthFactor
-              let verticalShift: CGFloat = 15 // Shift staff down to give clearance at top
+              let verticalShift: CGFloat = isPortrait ? 8 : 15 // Less shift in portrait
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
@@ -1073,7 +1096,7 @@ struct ContentView: View {
             #if os(macOS)
             .frame(height: 400) // Mac: increased to accommodate larger staff (was 320)
             #else
-            .frame(height: 420) // iPad: increased to accommodate larger staff (was 340)
+            .frame(height: isPortrait ? 520 : 420) // Portrait: MASSIVE staff (was 450), Landscape: same
             #endif
             .animation(.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0.1), value: vm.currentY)
             .foregroundStyle(.white)
@@ -1085,26 +1108,26 @@ struct ContentView: View {
               // Show hints only if enabled
               if appData.showHints {
                 Text("Clef:")
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .fontWeight(.semibold)
                   .fixedSize()
                 Text(vm.currentClef == .treble ? "Treble" : "Bass")
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .frame(minWidth: Platform.clefWidth, alignment: .leading)
                 Text("Note:")
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .fontWeight(.semibold)
                   .fixedSize()
                 Text(vm.currentNote.name)
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .monospaced()
                   .frame(minWidth: Platform.noteWidth, alignment: .leading)
                 Text("MIDI:")
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .fontWeight(.semibold)
                   .fixedSize()
                 Text(String(vm.currentNote.midi))
-                  .font(Platform.labelFont)
+                  .font(Platform.labelFont(isPortrait: isPortrait))
                   .monospaced()
                   .frame(minWidth: Platform.midiWidth, alignment: .leading)
               }
@@ -1119,7 +1142,8 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.white)
                 .foregroundStyle(.black)
-                .controlSize(.regular)
+                .controlSize(isPortrait ? .small : .regular) // Smaller in portrait
+                .fixedSize() // Prevent button from stretching
               }
               
               Spacer()
@@ -1130,25 +1154,25 @@ struct ContentView: View {
               Spacer()
               
               Text("Received Clef:")
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .fixedSize()
               Text(conductor.data.noteOn == 0 ? "—" : (conductor.data.noteOn < 60 ? "Bass" : (conductor.data.noteOn > 60 ? "Treble" : "Both")))
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .frame(minWidth: Platform.clefWidth, alignment: .leading)
               
               Text("Received Note:")
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .fixedSize()
               Text(conductor.data.noteOn == 0 ? "—" : noteName(from: conductor.data.noteOn))
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .monospaced()
                 .frame(minWidth: Platform.noteWidth, alignment: .leading)
               
               Text("Received MIDI:")
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .fixedSize()
               Text(String(conductor.data.noteOn))
-                .font(Platform.labelFont)
+                .font(Platform.labelFont(isPortrait: isPortrait))
                 .monospaced()
                 .frame(minWidth: Platform.midiWidth, alignment: .leading)
               
@@ -1156,7 +1180,12 @@ struct ContentView: View {
             }
           } // End staff VStack
           
-          Spacer()
+          if isPortrait {
+            Spacer()
+              .frame(maxWidth: 16) // Very compact spacer in portrait
+          } else {
+            Spacer()
+          }
           
           // Right speaker - centered with staff
           SpeakerView(
@@ -1166,25 +1195,32 @@ struct ContentView: View {
           #if os(macOS)
           .frame(width: 115, height: 155)
           #else
-          .frame(width: 135, height: 180) // Larger on iPad with more space available
+          .frame(width: isPortrait ? 150 : 135, height: isPortrait ? 200 : 180) // BIGGER speakers in portrait
           #endif
-          .padding(.top, 40) // Center vertically with staff
+          .padding(.top, isPortrait ? 12 : 40) // Very reduced top padding in portrait
           
           Spacer()
-            .frame(maxWidth: 120)
+            .frame(maxWidth: isPortrait ? 40 : 120) // Even more reduced side margins in portrait
         } // End HStack with speakers
-        .padding(.horizontal, 20)
-        //.padding(.top, 10) // Add top padding to raise entire row
+        .padding(.horizontal, isPortrait ? 8 : 20) // Minimal horizontal padding in portrait
         .foregroundStyle(.white)
+        
+        // In portrait, add spacing between text/buttons and practice controls (~1 inch)
+        if isPortrait {
+          Spacer()
+            .frame(height: 48) // Reduced gap (was 72) - bring controls closer to labels
+        }
           
           // Practice mode controls or free play button
           if isPracticeMode {
             HStack(spacing: 12) {
               Text("Practice Mode")
                 .fontWeight(.semibold)
+                .font(isPortrait ? .caption : .body)
               
               Text("Note \(currentPracticeIndex + 1) of \(practiceCount)")
                 .monospaced()
+                .font(isPortrait ? .caption : .body)
               
               Button("Exit Practice") {
                 exitPracticeMode()
@@ -1192,15 +1228,16 @@ struct ContentView: View {
               .buttonStyle(.borderedProminent)
               .tint(.white)
               .foregroundStyle(.red)
-              .controlSize(.regular)
+              .controlSize(isPortrait ? .small : .regular)
             }
             .foregroundStyle(.white)
-            .frame(height: 56)
+            .frame(height: isPortrait ? 40 : 56) // Smaller in portrait
           } else {
             // Practice mode controls only (New Note button is now in clef HStack above)
             HStack(spacing: 12) {
               Text("Practice")
                 .foregroundColor(.white)
+                .font(isPortrait ? .caption : .body)
               
               CustomNumberPicker("Count:", value: $practiceCount, in: 5...100, step: 5)
               
@@ -1210,22 +1247,46 @@ struct ContentView: View {
               .buttonStyle(.borderedProminent)
               .tint(.white)
               .foregroundStyle(.black)
-              .controlSize(.regular)
+              .controlSize(isPortrait ? .small : .regular)
             }
             .foregroundStyle(.white)
             .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
-            .frame(height: 56)
+            .frame(height: isPortrait ? 40 : 56) // Smaller in portrait
           }
           
-          Spacer()
-            .frame(minHeight: 8, maxHeight: 20) //8 20
+          // In portrait, add flexible spacer to keep keyboard at bottom
+          if isPortrait {
+            Spacer(minLength: 20) // Small flexible spacer - just fills remaining space
+          } else {
+            Spacer()
+              .frame(minHeight: 8, maxHeight: 20)
+          }
+          
+          // Add fixed spacing in portrait to keep practice controls above keyboard
+          if isPortrait {
+            Spacer()
+              .frame(height: 100) // Fixed ~1.5" gap between practice controls and keyboard
+          }
+          
+          // In portrait, embed keyboard directly in VStack at the bottom
+          if isPortrait {
+            KeyBoardView(isCorrect: { midi in
+              midi == vm.currentNote.midi
+            }, docked: true)
+            .environmentObject(appData)
+            .environmentObject(conductor)
+            .frame(height: 320)
+          }
         } // VStack
         .safeAreaInset(edge: .bottom) {
-          KeyBoardView(isCorrect: { midi in
-            midi == vm.currentNote.midi
-          }, docked: true)
-          .environmentObject(appData)
-          .environmentObject(conductor)
+          // In landscape, use safeAreaInset (original behavior)
+          if !isPortrait {
+            KeyBoardView(isCorrect: { midi in
+              midi == vm.currentNote.midi
+            }, docked: true)
+            .environmentObject(appData)
+            .environmentObject(conductor)
+          }
         }
         .padding(.horizontal, 8)
         .onAppear {
@@ -1427,7 +1488,7 @@ struct ContentView: View {
         }
       }
     }
-    .padding(.top, Platform.isMac ? 16 : 8)
+    .padding(.top, Platform.isMac ? 16 : (isPortrait ? 4 : 8)) // Reduced top padding in portrait
     .padding(.horizontal, Platform.horizontalPadding)
     .frame(maxWidth: .infinity)
     .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.35), radius: 0.5, x: 0, y: 1)
@@ -1451,7 +1512,7 @@ struct ContentView: View {
     static let buttonControlSize: ControlSize = .small
     static let horizontalPadding: CGFloat = 16
     // Label sizing for staff area
-    static let labelFont: Font = .body
+    static func labelFont(isPortrait: Bool) -> Font { .body }
     static let labelSpacing: CGFloat = 12
     static let clefWidth: CGFloat = 50
     static let noteWidth: CGFloat = 40
@@ -1469,8 +1530,8 @@ struct ContentView: View {
     static let calibrationWidth: CGFloat = 60
     static let buttonControlSize: ControlSize = .mini
     static let horizontalPadding: CGFloat = 8
-    // Label sizing for staff area (smaller for iPad)
-    static let labelFont: Font = .caption
+    // Label sizing for staff area - BIGGER in portrait mode
+    static func labelFont(isPortrait: Bool) -> Font { isPortrait ? .body : .caption }
     static let labelSpacing: CGFloat = 6
     static let clefWidth: CGFloat = 42
     static let noteWidth: CGFloat = 32
