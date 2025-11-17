@@ -79,6 +79,8 @@ class BluetoothMIDIManager: ObservableObject {
         // Get all MIDI inputs from the system
         let inputCount = MIDIGetNumberOfSources()
         
+        Log("🔍 Scanning \(inputCount) MIDI source(s)...")
+        
         for i in 0..<inputCount {
             let src = MIDIGetSource(i)
             guard src != 0 else { continue }
@@ -86,12 +88,39 @@ class BluetoothMIDIManager: ObservableObject {
             // Get unique ID
             var uniqueID: MIDIUniqueID = 0
             let uniqueIDErr = MIDIObjectGetIntegerProperty(src, kMIDIPropertyUniqueID, &uniqueID)
-            guard uniqueIDErr == noErr else { continue }
+            guard uniqueIDErr == noErr else { 
+                Log("⚠️ Failed to get uniqueID for source \(i)")
+                continue 
+            }
             
-            // Get device name
+            // Get device name (endpoint name)
             var nameRef: Unmanaged<CFString>?
             let nameErr = MIDIObjectGetStringProperty(src, kMIDIPropertyName, &nameRef)
-            let name = (nameErr == noErr && nameRef != nil) ? (nameRef!.takeRetainedValue() as String) : "Unknown Device"
+            var name = (nameErr == noErr && nameRef != nil) ? (nameRef!.takeRetainedValue() as String) : "Unknown Device"
+            
+            // For Bluetooth devices, try to get the actual device name from the display name or model
+            var displayNameRef: Unmanaged<CFString>?
+            if MIDIObjectGetStringProperty(src, kMIDIPropertyDisplayName, &displayNameRef) == noErr,
+               let displayName = displayNameRef?.takeRetainedValue() as String?,
+               !displayName.isEmpty {
+                // Use display name if it's more descriptive than the endpoint name
+                if displayName != name && !displayName.lowercased().contains("session") {
+                    Log("📝 Found display name for '\(name)': '\(displayName)'")
+                    name = displayName
+                }
+            }
+            
+            // Also try to get manufacturer/model info for Bluetooth devices
+            var modelRef: Unmanaged<CFString>?
+            if MIDIObjectGetStringProperty(src, kMIDIPropertyModel, &modelRef) == noErr,
+               let model = modelRef?.takeRetainedValue() as String?,
+               !model.isEmpty {
+                Log("📝 Found model for '\(name)': '\(model)'")
+                // If the current name is generic ("Bluetooth" or "Session 1"), use the model
+                if name.lowercased().contains("bluetooth") || name.lowercased().contains("session") {
+                    name = model
+                }
+            }
             
             // Check if it's a Bluetooth device
             let isBluetooth = name.lowercased().contains("bluetooth") || 
@@ -100,6 +129,9 @@ class BluetoothMIDIManager: ObservableObject {
             
             if isBluetooth {
                 bluetoothCount += 1
+                Log("📱 Found Bluetooth device: '\(name)' (ID: \(uniqueID))")
+            } else {
+                Log("🔌 Found USB/Network device: '\(name)' (ID: \(uniqueID))")
             }
             
             // Check connection status
@@ -161,8 +193,22 @@ class BluetoothMIDIManager: ObservableObject {
         
         if driverErr == noErr, let driver = driverRef?.takeRetainedValue() as String? {
             // Apple's Bluetooth MIDI driver identifier
-            return driver.contains("AppleMIDIBluetoothDriver") || 
-                   driver.contains("Bluetooth")
+            if driver.contains("AppleMIDIBluetoothDriver") || 
+               driver.contains("Bluetooth") ||
+               driver.contains("com.apple.bluetooth") {
+                return true
+            }
+        }
+        
+        // Also check the manufacturer property - some Bluetooth devices set this
+        var manufacturerRef: Unmanaged<CFString>?
+        if MIDIObjectGetStringProperty(endpoint, kMIDIPropertyManufacturer, &manufacturerRef) == noErr,
+           let manufacturer = manufacturerRef?.takeRetainedValue() as String? {
+            // Common Bluetooth MIDI indicators in manufacturer field
+            if manufacturer.lowercased().contains("bluetooth") ||
+               manufacturer.lowercased().contains("ble") {
+                return true
+            }
         }
         
         return false
