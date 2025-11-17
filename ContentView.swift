@@ -1110,7 +1110,7 @@ struct ContentView: View {
               context.draw(noteText, at: notePoint, anchor: .center)
             }
             #if os(macOS)
-            .frame(height: 400) // Mac: increased to accommodate larger staff (was 320)
+            .frame(height: 520) // Mac: increased to match iPad portrait to prevent C8/A0 clipping (was 400)
             #else
             .frame(height: isPortrait ? 520 : 420) // Portrait: MASSIVE staff (was 450), Landscape: same
             #endif
