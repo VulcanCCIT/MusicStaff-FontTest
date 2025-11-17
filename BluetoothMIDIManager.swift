@@ -16,7 +16,7 @@ private func Log(_ message: String) {
 }
 
 /// Represents a MIDI input source (Bluetooth or USB)
-struct MIDIInputSource: Identifiable, Hashable {
+struct MIDIInputSource: Identifiable, Hashable, Equatable {
     let id: MIDIUniqueID
     let name: String
     let isBluetooth: Bool
@@ -24,6 +24,13 @@ struct MIDIInputSource: Identifiable, Hashable {
     
     var displayName: String {
         isBluetooth ? "🔵 \(name)" : "🔌 \(name)"
+    }
+    
+    static func == (lhs: MIDIInputSource, rhs: MIDIInputSource) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.isBluetooth == rhs.isBluetooth &&
+               lhs.isConnected == rhs.isConnected
     }
 }
 

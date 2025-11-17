@@ -634,6 +634,8 @@ enum NavigationDestination: Hashable {
 struct ContentView: View {
   @EnvironmentObject private var appData: AppData
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Environment(\.verticalSizeClass) private var verticalSizeClass
   
   let trebleStaff = MusicSymbol.trebleStaff.text()
   let bassStaff = MusicSymbol.bassStaff.text()
@@ -678,16 +680,29 @@ struct ContentView: View {
     clefMode: .random
   )
   
-  // Computed property to determine if we're in portrait orientation
-  private var isPortrait: Bool {
+  // Track orientation with @State to prevent rapid re-renders during rotation
+  @State private var stableIsPortrait: Bool = {
     #if os(iOS)
-    // On iOS, check if height > width (portrait orientation)
     let screenBounds = UIScreen.main.bounds
     return screenBounds.height > screenBounds.width
     #else
-    // On macOS, always use landscape layout
     return false
     #endif
+  }()
+  
+  // Computed property to determine current orientation (for detecting changes)
+  private var currentOrientation: Bool {
+    #if os(iOS)
+    let screenBounds = UIScreen.main.bounds
+    return screenBounds.height > screenBounds.width
+    #else
+    return false
+    #endif
+  }
+  
+  // Use the stable version throughout the view
+  private var isPortrait: Bool {
+    stableIsPortrait
   }
   
   // Removed isWaitingForNote and receivedBlankDelay
@@ -854,8 +869,9 @@ struct ContentView: View {
   }
   
   var body: some View {
-    NavigationStack(path: $navigationPath) {
-      ZStack(alignment: isPortrait ? .top : .center) { // Align to top in portrait
+    GeometryReader { outerGeometry in
+      NavigationStack(path: $navigationPath) {
+        ZStack(alignment: stableIsPortrait ? .top : .center) { // Align to top in portrait
         // Subtle, adaptive background (unified gradient for both light and dark modes)
         Group {
           LinearGradient(
@@ -958,10 +974,10 @@ struct ContentView: View {
               context.translateBy(x: -noteX, y: -originalGroupMidY)
               #else
               // iPad: larger staff with adaptive scaling based on screen size and orientation
-              let baseScale: CGFloat = isPortrait ? 1.65 : 1.15 // Portrait: MUCH MUCH BIGGER (was 1.35), Landscape: same
+              let baseScale: CGFloat = isPortrait ? 1.65 : 1.04 // Portrait: MUCH MUCH BIGGER, Landscape: smaller to fit full range (was 1.08)
               let widthFactor = min(size.width / 700, 1.4) // Scale up to 40% larger on wide iPads
               let scale = baseScale * widthFactor
-              let verticalShift: CGFloat = isPortrait ? 8 : 15 // Less shift in portrait
+              let verticalShift: CGFloat = isPortrait ? 8 : 8 // Portrait: 8, Landscape: 8 (centered)
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
@@ -1268,25 +1284,17 @@ struct ContentView: View {
               .frame(height: 100) // Fixed ~1.5" gap between practice controls and keyboard
           }
           
-          // In portrait, embed keyboard directly in VStack at the bottom
-          if isPortrait {
-            KeyBoardView(isCorrect: { midi in
-              midi == vm.currentNote.midi
-            }, docked: true)
-            .environmentObject(appData)
-            .environmentObject(conductor)
-            .frame(height: 320)
-          }
+          // Keyboard removed from here - now always in safeAreaInset below
         } // VStack
         .safeAreaInset(edge: .bottom) {
-          // In landscape, use safeAreaInset (original behavior)
-          if !isPortrait {
-            KeyBoardView(isCorrect: { midi in
-              midi == vm.currentNote.midi
-            }, docked: true)
-            .environmentObject(appData)
-            .environmentObject(conductor)
-          }
+          // Always use safeAreaInset for keyboard (both portrait and landscape)
+          // This prevents structural changes during rotation
+          KeyBoardView(isCorrect: { midi in
+            midi == vm.currentNote.midi
+          }, docked: true)
+          .environmentObject(appData)
+          .environmentObject(conductor)
+          .frame(height: isPortrait ? 320 : nil) // Fixed height in portrait only
         }
         .padding(.horizontal, 8)
         .onAppear {
@@ -1360,7 +1368,25 @@ struct ContentView: View {
         }
       } // ZStack
     } // NavigationStack
-  } // body
+    .onChange(of: outerGeometry.size) { oldSize, newSize in
+      // Detect orientation change (width/height relationship flips)
+      let newIsPortrait = newSize.height > newSize.width
+      
+      // Only update if orientation actually changed
+      if newIsPortrait != stableIsPortrait {
+        // Debounce to wait for rotation animation to complete
+        Task { @MainActor in
+          try? await Task.sleep(nanoseconds: 300_000_000) // 300ms - wait for rotation to finish
+          
+          // Verify size is still stable (rotation completed)
+          if outerGeometry.size == newSize {
+            stableIsPortrait = newIsPortrait
+          }
+        }
+      }
+    }
+  } // GeometryReader
+} // body
   
   var midiReceivedIndicator: some View {
     VStack(spacing: 8) {
