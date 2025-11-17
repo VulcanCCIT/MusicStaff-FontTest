@@ -573,7 +573,7 @@ struct Keyboard3DView: View {
                             let relative = (keyY + keyDepth - clampedY) / keyDepth
                             let norm = max(0.0, min(1.0, relative))
                             let curved = pow(norm, 0.5) // bias louder
-                            let velocity = max(64, min(127, Int(curved * 127)))
+                            let velocity = max(120, min(127, Int(curved * 127))) // Raised on-screen min velocity from 64 -> 80 to increase perceived loudness
                             conductor.simulateNoteOn(noteNumber: newMidi, velocity: velocity)
                         }
 
