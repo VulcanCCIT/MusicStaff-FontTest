@@ -1376,7 +1376,7 @@ struct ContentView: View {
       if newIsPortrait != stableIsPortrait {
         // Debounce to wait for rotation animation to complete
         Task { @MainActor in
-          try? await Task.sleep(nanoseconds: 300_000_000) // 300ms - wait for rotation to finish
+          try? await Task.sleep(nanoseconds: 100_000_000) // 100ms - fast enough to avoid visible delay
           
           // Verify size is still stable (rotation completed)
           if outerGeometry.size == newSize {
