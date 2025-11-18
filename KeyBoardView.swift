@@ -115,15 +115,12 @@ struct KeyBoardView: View {
             }
           }
         }
-        .overlay(alignment: .center) {
-          NodeOutputView(conductor.instrument, color: .red)
-            .frame(height: 68)
-            .frame(width: 240)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(GlassReflection(cornerRadius: 8))
-            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-        }
-        .padding(.vertical, 20) //3DPanel Padding - increased for better proportions
+        // TODO(macOS spacing): Control panel vertical padding. Increase/decrease to change space above the rail.
+#if os(macOS)
+        .padding(.vertical, 10)
+#else
+        .padding(.vertical, 16)
+#endif
         .padding(.horizontal, 20)
         .frame(maxWidth: .infinity)
         .background(
@@ -136,8 +133,9 @@ struct KeyBoardView: View {
         PianoRail()
           .frame(height: 14)
           .padding(.horizontal, 22)
-          .padding(.top, -8)
-          .padding(.bottom, 8)
+          // TODO(macOS spacing): Piano rail spacing. Top is negative to tuck under panel; bottom is gap above the keyboard.
+          .padding(.top, -6)
+          .padding(.bottom, 4)
 
         // 3D Keyboard View - Simplified container with no complex height calculations
         ZStack {
@@ -153,7 +151,12 @@ struct KeyBoardView: View {
           )
         }
         .padding(.horizontal, 12) // Minimal side padding
-        .padding(.vertical, 12) // Minimal top/bottom padding
+        // TODO(macOS spacing): Keyboard chassis (blue rounded rectangle) vertical padding. Lower = shorter chassis.
+#if os(macOS)
+        .padding(.vertical, 20)//3
+#else
+        .padding(.vertical, 15)//10
+#endif
         .background(
           // Simplified styled background
           ZStack {
@@ -189,10 +192,12 @@ struct KeyBoardView: View {
             .opacity(0.9)
         )
         .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 6)
+        // TODO(macOS spacing): Bottom padding for keyboard container when docked vs undocked.
+        // docked ? X : Y — reduce to move the keyboard closer to the safe area.
         #if os(macOS)
-        .padding(.bottom, docked ? 8 : 40)
+        .padding(.bottom, docked ? 6 : 28)
         #else
-        .padding(.bottom, docked ? 12 : 12)
+        .padding(.bottom, docked ? 10 : 10)
         #endif
       }
       .overlay(alignment: .top) {
@@ -613,7 +618,11 @@ struct Keyboard3DView: View {
         let labelReserve = min(25, whiteFrontH * 1.2)
         
         // Use a fixed perspective ratio that works for all keyboard sizes
-        let perspectiveRatio: CGFloat = 0.22 // How much height is "above" the keyboard
+#if os(macOS)
+        let perspectiveRatio: CGFloat = 0.16 // Mac: reduce top overhead so keys ride higher into the blue area
+#else
+        let perspectiveRatio: CGFloat = 0.22 // iPad: unchanged
+#endif
         let usableHeight = totalHeight - labelReserve
         let keyboardDepth = usableHeight * (1.0 - perspectiveRatio)
         let keyboardY = usableHeight * perspectiveRatio
@@ -1056,7 +1065,11 @@ struct Keyboard3DView: View {
         // SIMPLIFIED - Match the drawing code's layout calculation exactly
         let whiteFrontH = whiteFrontHeight * scaleFor(size: size)
         let labelReserve = min(25, whiteFrontH * 1.2)
-        let perspectiveRatio: CGFloat = 0.22
+#if os(macOS)
+        let perspectiveRatio: CGFloat = 0.16
+#else
+        let perspectiveRatio: CGFloat = 0.16 //.22
+#endif
         let usableHeight = size.height - labelReserve
         let keyboardDepth = usableHeight * (1.0 - perspectiveRatio)
         let keyboardY = usableHeight * perspectiveRatio

@@ -965,10 +965,10 @@ struct ContentView: View {
               // Larger staff sizes that adapt to available screen space
               #if os(macOS)
               // Mac: adaptive scaling based on available width
-              let baseScale: CGFloat = 1.05 // Larger base scale (was 0.78)
+              let baseScale: CGFloat = 0.94 // Changed from 1.05 to 0.94 for ~10% smaller staff
               let widthFactor = min(size.width / 800, 1.3) // Scale up to 30% larger on wide screens
               let scale = baseScale * widthFactor
-              let verticalShift: CGFloat = 20 // Shift staff down for more top clearance
+              let verticalShift: CGFloat = 12 // Changed from 20 to 12 to reclaim vertical space
               context.translateBy(x: centerX, y: centerY + verticalShift)
               context.scaleBy(x: scale, y: scale)
               context.translateBy(x: -noteX, y: -originalGroupMidY)
@@ -1110,7 +1110,7 @@ struct ContentView: View {
               context.draw(noteText, at: notePoint, anchor: .center)
             }
             #if os(macOS)
-            .frame(height: 520) // Mac: increased to match iPad portrait to prevent C8/A0 clipping (was 400)
+            .frame(height: 480) // Changed from 520 to 480 to reduce vertical footprint on macOS only
             #else
             .frame(height: isPortrait ? 520 : 420) // Portrait: MASSIVE staff (was 450), Landscape: same
             #endif
@@ -1267,7 +1267,11 @@ struct ContentView: View {
             }
             .foregroundStyle(.white)
             .tint(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
-            .frame(height: isPortrait ? 40 : 56) // Smaller in portrait
+            #if os(macOS)
+            .frame(height: isPortrait ? 40 : 48)
+            #else
+            .frame(height: isPortrait ? 40 : 56)
+            #endif
           }
           
           // In portrait, add flexible spacer to keep keyboard at bottom
@@ -1280,8 +1284,13 @@ struct ContentView: View {
           
           // Add fixed spacing in portrait to keep practice controls above keyboard
           if isPortrait {
+            #if os(macOS)
             Spacer()
-              .frame(height: 100) // Fixed ~1.5" gap between practice controls and keyboard
+              .frame(height: 56)
+            #else
+            Spacer()
+              .frame(height: 100)
+            #endif
           }
           
           // Keyboard removed from here - now always in safeAreaInset below
