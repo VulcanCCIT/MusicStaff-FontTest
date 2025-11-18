@@ -16,7 +16,7 @@ private func Log(_ message: String) {
 }
 
 /// Represents a MIDI input source (Bluetooth or USB)
-struct MIDIInputSource: Identifiable, Hashable {
+struct MIDIInputSource: Identifiable, Hashable, Equatable {
     let id: MIDIUniqueID
     let name: String
     let isBluetooth: Bool
@@ -24,6 +24,13 @@ struct MIDIInputSource: Identifiable, Hashable {
     
     var displayName: String {
         isBluetooth ? "🔵 \(name)" : "🔌 \(name)"
+    }
+    
+    static func == (lhs: MIDIInputSource, rhs: MIDIInputSource) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.name == rhs.name &&
+               lhs.isBluetooth == rhs.isBluetooth &&
+               lhs.isConnected == rhs.isConnected
     }
 }
 
@@ -72,6 +79,8 @@ class BluetoothMIDIManager: ObservableObject {
         // Get all MIDI inputs from the system
         let inputCount = MIDIGetNumberOfSources()
         
+        Log("🔍 Scanning \(inputCount) MIDI source(s)...")
+        
         for i in 0..<inputCount {
             let src = MIDIGetSource(i)
             guard src != 0 else { continue }
@@ -79,20 +88,84 @@ class BluetoothMIDIManager: ObservableObject {
             // Get unique ID
             var uniqueID: MIDIUniqueID = 0
             let uniqueIDErr = MIDIObjectGetIntegerProperty(src, kMIDIPropertyUniqueID, &uniqueID)
-            guard uniqueIDErr == noErr else { continue }
+            guard uniqueIDErr == noErr else {
+                Log("⚠️ Failed to get uniqueID for source \(i)")
+                continue
+            }
             
-            // Get device name
-            var nameRef: Unmanaged<CFString>?
-            let nameErr = MIDIObjectGetStringProperty(src, kMIDIPropertyName, &nameRef)
-            let name = (nameErr == noErr && nameRef != nil) ? (nameRef!.takeRetainedValue() as String) : "Unknown Device"
+            // Gather CoreMIDI name properties (endpoint, entity, device)
+            func getString(_ obj: MIDIObjectRef, _ prop: CFString) -> String? {
+                var ref: Unmanaged<CFString>?
+                guard MIDIObjectGetStringProperty(obj, prop, &ref) == noErr,
+                      let s = ref?.takeRetainedValue() as String?, !s.isEmpty else { return nil }
+                return s
+            }
+
+            let endpoint = src
+            let endpointName = getString(endpoint, kMIDIPropertyName) ?? ""
+            let endpointDisplay = getString(endpoint, kMIDIPropertyDisplayName)
+            let endpointModel = getString(endpoint, kMIDIPropertyModel)
+
+            var entity: MIDIEntityRef = 0
+            if MIDIEndpointGetEntity(endpoint, &entity) != noErr { entity = 0 }
+            let entityName = entity != 0 ? getString(entity, kMIDIPropertyName) : nil
+            let entityDisplay = entity != 0 ? getString(entity, kMIDIPropertyDisplayName) : nil
+            let entityModel = entity != 0 ? getString(entity, kMIDIPropertyModel) : nil
+
+            var device: MIDIDeviceRef = 0
+            if entity != 0 {
+                if MIDIEntityGetDevice(entity, &device) != noErr { device = 0 }
+            }
+            let deviceName = device != 0 ? getString(device, kMIDIPropertyName) : nil
+            let deviceDisplay = device != 0 ? getString(device, kMIDIPropertyDisplayName) : nil
+            let deviceModel = device != 0 ? getString(device, kMIDIPropertyModel) : nil
+            let deviceManufacturer = device != 0 ? getString(device, kMIDIPropertyManufacturer) : nil
+
+            // Debug logging to understand available names
+            Log("🧭 Name props - endpoint: name='\(endpointName)', display='\(endpointDisplay ?? "—")', model='\(endpointModel ?? "—")'")
+            if entity != 0 {
+                Log("🧭 Name props - entity: name='\(entityName ?? "—")', display='\(entityDisplay ?? "—")', model='\(entityModel ?? "—")'")
+            }
+            if device != 0 {
+                Log("🧭 Name props - device: name='\(deviceName ?? "—")', display='\(deviceDisplay ?? "—")', model='\(deviceModel ?? "—")', mfr='\(deviceManufacturer ?? "—")'")
+            }
+
+            func isGeneric(_ s: String) -> Bool {
+                let l = s.lowercased().trimmingCharacters(in: .whitespaces)
+                if l == "bluetooth" { return true }
+                if l == "network" { return true }
+                if l.hasPrefix("session") { return true }
+                if l.hasPrefix("network session") { return true }
+                return false
+            }
+
+            var nameCandidates: [String] = []
+            // Prefer explicit display names first
+            if let s = endpointDisplay, !s.isEmpty { nameCandidates.append(s) }
+            if let s = deviceDisplay, !s.isEmpty { nameCandidates.append(s) }
+            if let s = entityDisplay, !s.isEmpty { nameCandidates.append(s) }
+            // Then models
+            if let s = deviceModel, !s.isEmpty { nameCandidates.append(s) }
+            if let s = entityModel, !s.isEmpty { nameCandidates.append(s) }
+            if let s = endpointModel, !s.isEmpty { nameCandidates.append(s) }
+            // Finally plain names as fallbacks
+            if let s = deviceName, !s.isEmpty { nameCandidates.append(s) }
+            if let s = entityName, !s.isEmpty { nameCandidates.append(s) }
+            if !endpointName.isEmpty { nameCandidates.append(endpointName) }
+
+            var name = nameCandidates.first(where: { !isGeneric($0) }) ?? (nameCandidates.first ?? "Unknown Device")
+            Log("🏷️ Chosen name: '\(name)'")
             
             // Check if it's a Bluetooth device
-            let isBluetooth = name.lowercased().contains("bluetooth") || 
+            let isBluetooth = name.lowercased().contains("bluetooth") ||
                             name.lowercased().contains("ble") ||
                             isBluetoothMIDIEndpoint(src)
             
             if isBluetooth {
                 bluetoothCount += 1
+                Log("📱 Found Bluetooth device: '\(name)' (ID: \(uniqueID))")
+            } else {
+                Log("🔌 Found USB/Network device: '\(name)' (ID: \(uniqueID))")
             }
             
             // Check connection status
@@ -154,8 +227,22 @@ class BluetoothMIDIManager: ObservableObject {
         
         if driverErr == noErr, let driver = driverRef?.takeRetainedValue() as String? {
             // Apple's Bluetooth MIDI driver identifier
-            return driver.contains("AppleMIDIBluetoothDriver") || 
-                   driver.contains("Bluetooth")
+            if driver.contains("AppleMIDIBluetoothDriver") ||
+               driver.contains("Bluetooth") ||
+               driver.contains("com.apple.bluetooth") {
+                return true
+            }
+        }
+        
+        // Also check the manufacturer property - some Bluetooth devices set this
+        var manufacturerRef: Unmanaged<CFString>?
+        if MIDIObjectGetStringProperty(endpoint, kMIDIPropertyManufacturer, &manufacturerRef) == noErr,
+           let manufacturer = manufacturerRef?.takeRetainedValue() as String? {
+            // Common Bluetooth MIDI indicators in manufacturer field
+            if manufacturer.lowercased().contains("bluetooth") ||
+               manufacturer.lowercased().contains("ble") {
+                return true
+            }
         }
         
         return false
@@ -247,7 +334,7 @@ struct MIDIDeviceSettingsView: View {
             } header: {
                 Text("Available MIDI Devices")
             } footer: {
-                Text("All detected devices are automatically connected. Bluetooth MIDI keyboards appear as \"Bluetooth\" (iOS combines all Bluetooth MIDI devices under one endpoint).")
+                Text("All detected devices are automatically connected. Bluetooth MIDI keyboards usually appear with their product name (e.g., \"XKEY Air 37 BLE\"). On iOS, multiple devices can still be consolidated under a single \"Bluetooth\" endpoint.")
             }
             
             Section {
@@ -347,3 +434,4 @@ struct MIDIInputRow: View {
     
     return MIDIDeviceSettingsView(bluetoothManager: manager)
 }
+
