@@ -1,25 +1,103 @@
 import SwiftUI
-// Uses StaffThumbnailSizing for consistent thumbnail sizes
 
-// Helper struct to group practice attempts by target
+// MARK: - PracticeResultsView
+/// A comprehensive view that displays the results of a completed practice session.
+///
+/// This view shows a detailed breakdown of practice performance including:
+/// - Session summary with first-try correct count and multiple attempt count
+/// - Individual note results with visual staff representation
+/// - Statistics sheet with session and lifetime trends
+/// - Automatic session persistence to SwiftData
+///
+/// The view automatically saves the practice session on appearance using `PracticeDataService`.
+///
+/// ## Topics
+/// ### Main View
+/// - ``PracticeResultsView``
+///
+/// ### Supporting Views
+/// - ``StatisticsSheet``
+/// - ``StaffThumbnailView``
+/// - ``PracticeNoteResultRow``
+///
+/// ### Data Models
+/// - ``PracticeTarget``
+
+// MARK: - PracticeTarget
+/// A hashable identifier for grouping practice attempts by their target note.
+///
+/// Used to group multiple attempts at the same note (same MIDI, clef, and accidental)
+/// for display and analysis purposes.
 struct PracticeTarget: Hashable {
+    /// The MIDI note number (0-127) of the target note.
     let midi: Int
+    
+    /// The clef context (treble or bass) in which the note was presented.
     let clef: Clef
+    
+    /// The accidental symbol for the note (♯, ♭, ♮, or empty string for natural).
     let accidental: String
 }
 
+// MARK: - PracticeResultsView
+/// Displays comprehensive results after completing a practice session.
+///
+/// This view presents practice session results with three main sections:
+/// 1. **Summary Statistics** - Overall performance metrics
+/// 2. **Note-by-Note Results** - Detailed breakdown of each practiced note with staff visualization
+/// 3. **Statistics Sheet** (modal) - Deep analysis of session and lifetime trends
+///
+/// ## Example Usage
+/// ```swift
+/// PracticeResultsView(
+///     attempts: practiceAttempts,
+///     settings: practiceSettings,
+///     sessionStartDate: sessionStart
+/// )
+/// ```
+///
+/// ## Session Persistence
+/// The view automatically saves the practice session to SwiftData on appearance. Saving
+/// happens asynchronously in the background and is only performed once per session.
 struct PracticeResultsView: View {
+    // MARK: - Properties
+    
+    /// All practice attempts from the completed session, ordered chronologically.
     let attempts: [PracticeAttempt]
+    
+    /// The practice configuration used for this session.
     let settings: PracticeSettings
+    
+    /// The date and time when the practice session started.
     let sessionStartDate: Date
+    
+    // MARK: - Environment
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     
+    // MARK: - State
+    
+    /// Tracks whether the session has been saved to prevent duplicate saves.
     @State private var isSaved: Bool = false
+    
+    /// Stores any error that occurs during session save.
     @State private var saveError: Error?
+    
+    /// Controls the presentation of the statistics sheet.
     @State private var showStatistics: Bool = false
 
+    // MARK: - Computed Properties
+    
+    /// Groups practice attempts by their target note and calculates first-try success.
+    ///
+    /// This computed property:
+    /// - Groups all attempts by `PracticeTarget` (midi, clef, accidental)
+    /// - Sorts attempts chronologically within each group
+    /// - Determines if the first attempt was correct
+    /// - Returns results sorted by first attempt timestamp
+    ///
+    /// - Returns: An array of tuples containing target info, sorted attempts, and first-try success flag.
     private var groupedResults: [(target: PracticeTarget, attempts: [PracticeAttempt], firstTryCorrect: Bool)] {
         let grouped = Dictionary(grouping: attempts) { attempt in
             PracticeTarget(midi: attempt.targetMidi, clef: attempt.targetClef, accidental: attempt.targetAccidental)
@@ -39,6 +117,12 @@ struct PracticeResultsView: View {
         }
     }
 
+    /// Summarizes overall session performance.
+    ///
+    /// - Returns: A tuple containing:
+    ///   - `firstTryCorrect`: Number of notes answered correctly on first try
+    ///   - `multipleAttempts`: Number of notes requiring more than one attempt
+    ///   - `totalAttempts`: Total number of individual attempts made
     private var summary: (firstTryCorrect: Int, multipleAttempts: Int, totalAttempts: Int) {
         let firstTryCorrect = groupedResults.filter { $0.firstTryCorrect }.count
         let multipleAttempts = groupedResults.filter { !$0.firstTryCorrect }.count
@@ -46,6 +130,12 @@ struct PracticeResultsView: View {
         return (firstTryCorrect, multipleAttempts, totalAttempts)
     }
     
+    // MARK: - Helper Methods
+    
+    /// Converts a MIDI note number to its standard name with octave.
+    ///
+    /// - Parameter midiNote: The MIDI note number (0-127).
+    /// - Returns: The note name in the format "C#4" or "—" if out of range.
     private func noteName(from midiNote: Int) -> String {
         guard (0...127).contains(midiNote) else { return "—" }
         let names = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
@@ -55,6 +145,10 @@ struct PracticeResultsView: View {
     }
     
     // MARK: - Session Statistics (Trends)
+    
+    /// Computes the most commonly played incorrect notes in this session.
+    ///
+    /// - Returns: Array of MIDI notes with their incorrect play counts, sorted by frequency (highest first).
     private var incorrectPlayedCounts: [(midi: Int, count: Int)] {
         let counts = attempts.filter { $0.outcome == .incorrect }.reduce(into: [Int: Int]()) { dict, attempt in
             dict[attempt.playedMidi, default: 0] += 1
@@ -65,6 +159,9 @@ struct PracticeResultsView: View {
         }.map { (key: Int, value: Int) in (midi: key, count: value) }
     }
 
+    /// Maps each incorrectly played note to the target notes it was mistaken for.
+    ///
+    /// - Returns: Dictionary mapping played MIDI → (target MIDI → count).
     private var playedToMistakenTargets: [Int: [Int: Int]] {
         var mapping: [Int: [Int: Int]] = [:]
         for a in attempts where a.outcome == .incorrect {
@@ -75,6 +172,9 @@ struct PracticeResultsView: View {
         return mapping
     }
 
+    /// Identifies notes that were always correct on the first (and only) attempt.
+    ///
+    /// - Returns: Array of target notes with 100% accuracy in this session.
     private var alwaysCorrectTargets: [PracticeTarget] {
         groupedResults.filter { group in
             // Always correct in this session means only one attempt and it was correct on first try
@@ -82,6 +182,9 @@ struct PracticeResultsView: View {
         }.map { $0.target }
     }
 
+    /// Identifies notes that required multiple attempts, sorted by difficulty.
+    ///
+    /// - Returns: Array of tuples with target note and attempt count, sorted by attempt count (most attempts first).
     private var toughTargets: [(target: PracticeTarget, attempts: Int)] {
         groupedResults.filter { !$0.firstTryCorrect }.map { ($0.target, $0.attempts.count) }.sorted { lhs, rhs in
             if lhs.attempts == rhs.attempts { return lhs.target.midi < rhs.target.midi }
@@ -163,6 +266,19 @@ struct PracticeResultsView: View {
     
     // MARK: - Save Practice Results
     
+    /// Saves the completed practice session to persistent storage.
+    ///
+    /// This method:
+    /// - Runs asynchronously on a background task
+    /// - Only executes once (subsequent calls are ignored)
+    /// - Uses `PracticeDataService` to persist the session
+    /// - Updates the `isSaved` flag on success
+    /// - Logs errors to the console and stores them in `saveError`
+    ///
+    /// The save operation includes:
+    /// - Session start and end times
+    /// - Practice settings configuration
+    /// - All practice attempts with outcomes
     private func savePracticeResults() {
         guard !isSaved else { return } // Don't save twice
         
@@ -189,6 +305,25 @@ struct PracticeResultsView: View {
     }
 }
 
+// MARK: - StatisticsSheet
+/// A detailed statistics view presented as a sheet, showing session and lifetime trends.
+///
+/// This view provides two scope modes:
+/// - **This Session**: Statistics specific to the current practice session
+/// - **All Time**: Cumulative statistics across all recorded sessions
+///
+/// ## Session Statistics
+/// - Most common incorrect notes played
+/// - Always correct notes (first try only)
+/// - Tough notes requiring multiple attempts
+///
+/// ## Lifetime Statistics
+/// - Most common incorrect notes across all sessions
+/// - Consistently correct notes (100% accuracy)
+/// - Notes needing practice (lowest accuracy)
+///
+/// The view supports an optional thumbnail mode that shows staff notation for each note,
+/// automatically enabled on wide windows (≥900pt) but user-overridable.
 struct StatisticsSheet: View {
     let incorrectPlayedCounts: [(midi: Int, count: Int)]
     let playedToMistakenTargets: [Int: [Int: Int]]
@@ -526,6 +661,24 @@ struct StatisticsSheet: View {
     }
 }
 
+// MARK: - StaffThumbnailView
+/// A compact visual representation of a musical note on a staff.
+///
+/// This view renders a scaled-down version of the staff with the specified note,
+/// using the same coordinate system and geometry as `PracticeNoteResultRow` to
+/// ensure visual consistency.
+///
+/// ## Features
+/// - Displays both treble and bass clefs (active clef is opaque, inactive is 30% opacity)
+/// - Shows ledger lines for notes outside the staff
+/// - Renders accidentals (♯, ♭, ♮)
+/// - Automatically scales to fit the available frame
+///
+/// ## Example Usage
+/// ```swift
+/// StaffThumbnailView(midi: 60, clef: .treble, accidental: "")
+///     .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+/// ```
 struct StaffThumbnailView: View {
     let midi: Int
     let clef: Clef
@@ -620,6 +773,29 @@ struct StaffThumbnailView: View {
     }
 }
 
+// MARK: - PracticeNoteResultRow
+/// A detailed row displaying the results for a single practiced note.
+///
+/// This view shows:
+/// - Note number and name (e.g., "Note 1: C4")
+/// - Status indicator (✓ First Try or ↻ X Attempts)
+/// - Visual staff representation with both treble and bass clefs
+/// - The target note highlighted in green (if incorrect attempts were made)
+/// - Up to 6 incorrect attempts shown as semi-transparent red notes
+/// - List of incorrect note names below the staff
+///
+/// ## Visual Design
+/// - Green background/border for first-try correct notes
+/// - Orange background/border for notes requiring multiple attempts
+/// - Centered staff display matching the main practice view
+/// - Incorrect attempts stacked horizontally to the right of the target
+///
+/// ## Canvas Rendering
+/// The staff is rendered using SwiftUI's `Canvas` API with careful attention to:
+/// - Coordinate transformation and centering
+/// - Clef-appropriate note placement
+/// - Ledger line positioning
+/// - Accidental symbol placement
 struct PracticeNoteResultRow: View {
     let noteNumber: Int
     let target: PracticeTarget

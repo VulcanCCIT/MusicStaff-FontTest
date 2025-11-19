@@ -17,81 +17,227 @@ import AVFAudio
 import CoreAudio
 #endif
 
-// Simple logging function
+// MARK: - Logging
+
+/// Simple logging function for MIDI monitoring messages.
+///
+/// All messages are prefixed with `[MIDIMonitor]` for easy filtering in console.
 fileprivate func Log(_ message: String) {
     print("[MIDIMonitor] \(message)")
 }
 
-// struct representing last data received of each type
+// MARK: - MIDI Monitor Data
 
+/// Container for the most recently received MIDI event data of each type.
+///
+/// This struct stores the last values received for various MIDI message types,
+/// useful for debugging and displaying current MIDI controller state.
 struct MIDIMonitorData {
+    /// Last note-on note number (0-127)
     var noteOn = 0
+    
+    /// Last note-on velocity (0-127)
     var velocity = 0
+    
+    /// Last note-off note number (0-127)
     var noteOff = 0
+    
+    /// Last MIDI channel (1-16)
     var channel = 0
+    
+    /// Last aftertouch pressure value (0-127)
     var afterTouch = 0
+    
+    /// Note number for last aftertouch message
     var afterTouchNoteNumber = 0
+    
+    /// Last program change number (0-127)
     var programChange = 0
+    
+    /// Last pitch wheel value (-8192 to 8191)
     var pitchWheelValue = 0
+    
+    /// Last continuous controller number (0-127)
     var controllerNumber = 0
+    
+    /// Last continuous controller value (0-127)
     var controllerValue = 0
 }
 
+// MARK: - MIDI Event Type
+
+/// Classification of MIDI event types for UI state management.
 enum MIDIEventType {
+    /// No MIDI event
     case none
+    
+    /// Note-on event (key pressed)
     case noteOn
+    
+    /// Note-off event (key released)
     case noteOff
+    
+    /// Continuous controller change (knobs, sliders, pedals)
     case continuousControl
+    
+    /// Program change (instrument/patch selection)
     case programChange
 }
 
+// MARK: - MIDI Monitor Conductor
+
+/// Central controller for MIDI input, audio synthesis, and event management.
+///
+/// `MIDIMonitorConductor` is the heart of the app's MIDI functionality:
+/// - Receives MIDI input from hardware devices (Bluetooth and USB)
+/// - Synthesizes audio using AudioKit's AppleSampler
+/// - Manages active notes and stuck note prevention
+/// - Publishes events for UI updates
+/// - Handles audio routing changes (AirPlay, device switching)
+///
+/// ## Architecture
+///
+/// ```
+/// MIDI Input → MIDIMonitorConductor → AudioKit Engine → Audio Output
+///                      ↓
+///                 Publishers (noteOnSubject, noteOffSubject)
+///                      ↓
+///                  UI Updates
+/// ```
+///
+/// ## Usage
+///
+/// Create once at app launch and inject as an environment object:
+/// ```swift
+/// @StateObject private var conductor = MIDIMonitorConductor()
+/// // ...
+/// .environmentObject(conductor)
+/// ```
+///
+/// ## Key Features
+///
+/// - **Real-time audio synthesis**: Low-latency piano sound using SoundFont
+/// - **Stuck note prevention**: Automatic cleanup of notes held too long
+/// - **Device management**: Handles audio route changes gracefully
+/// - **Event publishing**: Combine publishers for reactive UI updates
 class MIDIMonitorConductor: ObservableObject, MIDIListener {
+    // MARK: - Audio Components
+    
+    /// AudioKit MIDI interface for receiving MIDI events.
     let midi = AudioKit.MIDI()
-    // Audio engine and instrument (Option B)
+    
+    /// AudioKit audio engine for synthesis.
     let engine = AudioEngine()
+    
+    /// Sample-based piano instrument loaded from SoundFont.
     var instrument = AppleSampler()
+    
+    /// Whether the audio engine has been started.
     private var engineStarted = false
+    
+    /// Whether the SoundFont instrument has been loaded.
     private var instrumentLoaded = false
 
-    // Scale external MIDI velocities to match on-screen loudness
+    // MARK: - Published State
+    
+    /// Velocity boost multiplier for external MIDI input.
+    ///
+    /// External MIDI keyboards often send lower velocities than touch input.
+    /// This multiplier (default 2.25) scales them up for consistent loudness.
     @Published var externalVelocityBoost: Double = 2.25
 
+    /// Most recent MIDI event data for debugging/display.
     @Published var data = MIDIMonitorData()
+    
+    /// Whether a MIDI event was recently received (for visual feedback).
     @Published var isShowingMIDIReceived: Bool = false
+    
+    /// Toggle state (unused, retained for potential future features).
     @Published var isToggleOn: Bool = false
+    
+    /// Previous controller value for detecting changes.
     @Published var oldControllerValue: Int = 0
+    
+    /// Type of the most recent MIDI event.
     @Published var midiEventType: MIDIEventType = .none
+    
+    /// Set of currently active (held) note numbers.
+    ///
+    /// Updated on note-on and note-off events. Used for visual feedback
+    /// in the keyboard view.
     @Published var activeNotes = Set<Int>()
+    
+    /// Unique ID that changes on each note-on event.
+    ///
+    /// Causes SwiftUI views to re-render when notes are pressed.
     @Published var noteOnEventID = UUID()
+    
+    /// Whether the last event came from on-screen keyboard vs external MIDI.
     @Published var lastEventWasSimulated: Bool = false
 
-    // Per-event publishers (Option A): emit exact payloads for immediate handling
+    // MARK: - Event Publishers
+    
+    /// Publisher for note-on events: (noteNumber, velocity).
+    ///
+    /// Subscribe to this for immediate reaction to note presses:
+    /// ```swift
+    /// conductor.noteOnSubject.sink { note, velocity in
+    ///     // Handle note on
+    /// }
+    /// ```
     let noteOnSubject = PassthroughSubject<(Int, Int), Never>()
+    
+    /// Publisher for note-off events: noteNumber.
+    ///
+    /// Subscribe to this for immediate reaction to note releases:
+    /// ```swift
+    /// conductor.noteOffSubject.sink { note in
+    ///     // Handle note off
+    /// }
+    /// ```
     let noteOffSubject = PassthroughSubject<Int, Never>()
     
-    // Bluetooth MIDI manager (optional, for enhanced device management)
+    // MARK: - Device Management
+    
+    /// Bluetooth MIDI device manager for enhanced device discovery.
+    ///
+    /// Lazily initialized when accessed. Provides UI for viewing and
+    /// managing connected MIDI devices.
     lazy var bluetoothManager: BluetoothMIDIManager = {
         BluetoothMIDIManager(midi: self.midi)
     }()
     
     #if os(macOS)
+    /// Whether the default audio output device change listener is installed (macOS only).
     private var defaultDeviceListenerInstalled = false
     #endif
     
     // MARK: - Stuck Note Prevention
-    /// Track when each note was turned on to detect stuck notes
+    
+    /// Tracks when each note was turned on to detect stuck notes.
+    ///
+    /// Maps MIDI note number → timestamp of note-on event.
     private var noteOnTimestamps: [Int: Date] = [:]
-    /// Maximum duration a note can be held before being automatically released (10 seconds)
+    
+    /// Maximum duration a note can be held before automatic release (10 seconds).
+    ///
+    /// Prevents stuck notes from Bluetooth interference or missed note-off events.
     private let stuckNoteTimeout: TimeInterval = 10.0
-    /// Timer for checking stuck notes
+    
+    /// Timer that periodically checks for stuck notes.
     private var stuckNoteTimer: Timer?
 
+    // MARK: - Audio Session Configuration
+    
     #if os(iOS)
-    /// Configure AVAudioSession for playback (required on iOS/iPadOS to enable AirPlay/HomePod routing)
+    /// Configure AVAudioSession for playback (iOS/iPadOS only).
+    ///
+    /// Required to enable AirPlay, Bluetooth speakers, and HomePod routing.
+    /// Sets the audio category to `.playback` mode.
     private func configureAudioSessionForPlayback() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // Use .playback to allow AirPlay output; add .mixWithOthers if you want to mix with other apps
+            // Use .playback to allow AirPlay output; add .mixWithOthers if mixing with other apps
             try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
             Log("AVAudioSession configured for playback")
@@ -101,13 +247,21 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     }
     #endif
 
+    // MARK: - Initialization
+    
+    /// Initialize the MIDI conductor with audio engine and notification observers.
     init() {
-        // Configure audio chain
+        // Connect instrument to engine output
         engine.output = instrument
+        
+        // Load the SoundFont instrument
         loadInstrument()
+        
+        // Start monitoring for stuck notes
         startStuckNoteMonitoring()
         
-        // Observe AVAudioEngine configuration changes (all platforms)
+        // Observe audio engine configuration changes (all platforms)
+        // This fires when sample rate changes, device switches, etc.
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleEngineConfigurationChange),
@@ -115,12 +269,13 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
             object: nil
         )
         
-        // Observe default output device changes (macOS)
+        // Observe default output device changes (macOS only)
         #if os(macOS)
         installDefaultOutputDeviceListenerIfNeeded()
         #endif
         
-        // Observe AVAudioSession route changes (iOS/iPadOS)
+        // Observe audio route changes (iOS/iPadOS only)
+        // Fires when AirPlay connects/disconnects, headphones plugged in, etc.
         #if os(iOS)
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
@@ -132,12 +287,19 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         #endif
     }
     
+    /// Cleanup when conductor is deallocated.
     deinit {
         stopStuckNoteMonitoring()
     }
     
+    // MARK: - Instrument Loading
+    
+    /// Load the piano SoundFont into the sampler instrument.
+    ///
+    /// Loads `YDP-GrandPiano.sf2` from the app bundle. Safe to call multiple times
+    /// (will skip if already loaded).
     private func loadInstrument() {
-        // Load the instrument (SoundFont) - safe to call multiple times
+        // Skip if already loaded
         guard !instrumentLoaded else { return }
         
         do {
@@ -168,6 +330,19 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         }
     }
 
+    // MARK: - Lifecycle Methods
+    
+    /// Start the MIDI monitor and audio engine.
+    ///
+    /// This method:
+    /// 1. Configures the audio session (iOS/iPadOS only)
+    /// 2. Loads the instrument if not already loaded
+    /// 3. Opens MIDI input connections (Bluetooth and all devices)
+    /// 4. Registers this object as a MIDI listener
+    /// 5. Starts the audio engine if not already running
+    ///
+    /// Safe to call multiple times (idempotent operations).
+    /// Should be called when the app launches or becomes active.
     func start() {
         // Ensure audio session allows AirPlay/HomePod routing on iPad
         #if os(iOS)
@@ -179,8 +354,8 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         // Ensure correct preset applied even if engine was reconfigured earlier
         
         Log("🎵 Opening MIDI inputs...")
-        midi.openInput(name: "Bluetooth")
-        midi.openInput()
+        midi.openInput(name: "Bluetooth")  // Specific Bluetooth input
+        midi.openInput()                   // All other inputs
         midi.addListener(self)
         Log("🎵 MIDI listener registered. Available inputs: \(midi.inputNames)")
 
@@ -198,6 +373,10 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
         }
     }
 
+    /// Stop the MIDI monitor and audio engine.
+    ///
+    /// Closes all MIDI inputs and stops the audio engine.
+    /// Typically called when the app goes into the background.
     func stop() {
         midi.closeAllInputs()
 
@@ -210,7 +389,11 @@ class MIDIMonitorConductor: ObservableObject, MIDIListener {
     
     // MARK: - Stuck Note Prevention
     
-    /// Start monitoring for stuck notes that remain "on" too long
+    /// Start monitoring for stuck notes that remain active too long.
+    ///
+    /// Runs a timer every 2 seconds to check if any notes have been held
+    /// longer than ``stuckNoteTimeout`` (10 seconds). Automatically releases
+    /// stuck notes to prevent endless drone from missed note-off events.
     private func startStuckNoteMonitoring() {
         // Check every 2 seconds for stuck notes
         stuckNoteTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in

@@ -2,6 +2,26 @@
 //import SwiftData
 //@testable import MusicStaff_FontTest
 //
+// MARK: - Practice Data Models Tests
+/// Test suite for practice data model conversions and calculations.
+///
+/// These tests verify:
+/// - Correct conversion between transient and persistent models
+/// - Accurate session statistics calculations
+/// - Proper handling of first-try vs. multiple-attempt logic
+///
+/// ## Test Coverage
+/// ### Model Conversions
+/// - `PracticeAttempt` → `PersistedPracticeAttempt`
+/// - `PracticeSettings` → `PracticeSessionSettings`
+///
+/// ### Session Calculations
+/// - Duration calculation
+/// - First-try correct counting
+/// - Multiple attempts grouping
+///
+/// - Note: Tests are currently commented out but provide a foundation for
+///   validating the practice tracking system.
 //@Suite("Practice Data Models Tests")
 //struct PracticeDataModelsTests {
 //    
@@ -74,6 +94,32 @@
 //    }
 //}
 //
+// MARK: - Practice Data Service Tests
+/// Test suite for `PracticeDataService` functionality.
+///
+/// These tests use an in-memory SwiftData container to verify:
+/// - Session saving and retrieval
+/// - Note performance analysis
+/// - Accuracy calculations
+/// - First-try success detection
+///
+/// ## Test Coverage
+/// ### Session Persistence
+/// - Saving practice sessions with attempts
+/// - Fetching all sessions from storage
+/// - Verifying session metadata integrity
+///
+/// ### Performance Analysis
+/// - Computing per-note accuracy
+/// - Identifying notes with lower performance
+/// - Sorting results by accuracy (worst first)
+///
+/// ## Implementation Notes
+/// Tests create temporary in-memory databases to avoid affecting production data.
+/// Each test is isolated and creates its own fresh model container.
+///
+/// - Note: Tests are currently commented out but provide essential validation
+///   for the data persistence layer.
 //@Suite("Practice Data Service Tests")
 //struct PracticeDataServiceTests {
 //    

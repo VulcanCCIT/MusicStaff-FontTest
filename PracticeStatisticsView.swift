@@ -1,6 +1,43 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - PracticeStatisticsView
+/// A comprehensive statistics dashboard showing lifetime practice performance.
+///
+/// This view provides detailed analytics across all practice sessions including:
+/// - **Overall Performance**: Accuracy, session counts, and attempt metrics
+/// - **Session Activity**: Total attempts, average duration, last practice date
+/// - **Lifetime Note Trends**: Most common mistakes, consistently correct notes, notes needing practice
+/// - **Note Performance Analysis**: Individual note accuracy sorted by performance
+///
+/// ## Features
+/// ### Thumbnail Mode
+/// The view supports an optional thumbnail mode that displays staff notation for each note.
+/// This mode is:
+/// - Automatically enabled on windows ≥900pt wide
+/// - User-overridable via a toggle switch
+/// - Stored in `@AppStorage` to persist across launches
+///
+/// ### Performance Cards
+/// Statistics are organized into themed cards:
+/// - **Overall Performance** - Accuracy, sessions, first-try correct, multiple attempts
+/// - **Session Activity** - Total attempts, average duration, last practice date
+/// - **Lifetime Trends** - Common mistakes, perfect notes, notes needing work
+/// - **Note Analysis** - Detailed per-note accuracy breakdown
+///
+/// ### Debug Tools
+/// In debug builds, the toolbar includes utilities for:
+/// - Counting sessions in the database
+/// - Creating test sessions
+/// - Refreshing statistics
+///
+/// ## Example Usage
+/// ```swift
+/// NavigationView {
+///     PracticeStatisticsView()
+/// }
+/// .modelContainer(for: PracticeSession.self)
+/// ```
 struct PracticeStatisticsView: View {
     @Environment(\.modelContext) private var modelContext
     
@@ -551,6 +588,16 @@ struct PracticeStatisticsView: View {
     }
 }
 
+// MARK: - StatisticCard
+/// A compact card view displaying a single statistic with icon and color theming.
+///
+/// Visual design:
+/// - Icon and value aligned horizontally
+/// - Color-coded to match the statistic type
+/// - Rounded rectangle background
+/// - Minimum height of 80pt for consistency
+///
+/// Used in grid layouts to create the dashboard-style statistics interface.
 struct StatisticCard: View {
     let title: String
     let value: String
@@ -588,6 +635,17 @@ struct StatisticCard: View {
     }
 }
 
+// MARK: - NotePerformanceRow
+/// A detailed row displaying performance metrics for a single note.
+///
+/// Shows:
+/// - Optional staff thumbnail (if enabled)
+/// - Note name, clef, and accidental
+/// - Correct/total attempt counts
+/// - Accuracy percentage with color-coded badge
+///   - Green: ≥80% accuracy
+///   - Orange: 60-79% accuracy
+///   - Red: <60% accuracy
 struct NotePerformanceRow: View {
     let performance: NotePerformance
     var showThumbnail: Bool = false
@@ -653,6 +711,27 @@ struct NotePerformanceRow: View {
     }
 }
 
+// MARK: - NoteOnStaffView
+/// A Canvas-based view that renders a musical note on a staff system.
+///
+/// This view is used throughout the statistics interface to provide visual
+/// context for note performance data. It renders:
+/// - Both treble and bass clefs (active clef opaque, inactive at 30% opacity)
+/// - The target note at the correct vertical position
+/// - Ledger lines for notes outside the staff
+/// - Accidental symbols (♯, ♭, ♮)
+///
+/// ## Rendering Details
+/// The view uses SwiftUI's `Canvas` API with:
+/// - Coordinate transformation for centering
+/// - Scaling to fit available space
+/// - Same geometry constants as `PracticeNoteResultRow` for consistency
+///
+/// ## Example Usage
+/// ```swift
+/// NoteOnStaffView(midi: 60, clef: .treble, accidental: "")
+///     .frame(width: StaffThumbnailSizing.width, height: StaffThumbnailSizing.height)
+/// ```
 struct NoteOnStaffView: View {
     let midi: Int
     let clef: Clef
