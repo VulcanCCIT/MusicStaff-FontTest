@@ -2,6 +2,42 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+// MARK: - PracticeHistoryView
+/// A comprehensive view for browsing, managing, and analyzing practice session history.
+///
+/// This view provides:
+/// - **Split-view interface** with session list (sidebar) and detail view
+/// - **Session management** including deletion and bulk operations
+/// - **Data export** to CSV format
+/// - **Statistics dashboard** with lifetime performance analysis
+/// - **Data management** with automatic cleanup and retention policies
+///
+/// ## Features
+/// ### Session List
+/// - Displays all practice sessions sorted by date (most recent first)
+/// - Shows accuracy percentage, attempt counts, and timing
+/// - Supports swipe-to-delete on individual sessions
+/// - Selection updates the detail view
+///
+/// ### Detail View
+/// - Shows comprehensive session information
+/// - Displays note-by-note results with staff visualization
+/// - Includes practice settings used for the session
+///
+/// ### Toolbar Actions
+/// - **Statistics**: Opens detailed performance analytics
+/// - **Data Management**: Configures retention policies and cleanup
+/// - **Export to CSV**: Generates downloadable data file
+/// - **Clear All History**: Removes all practice data (with confirmation)
+///
+/// ## Example Usage
+/// ```swift
+/// NavigationStack {
+///     PracticeHistoryView(navigationPath: $path)
+///         .modelContainer(for: PracticeSession.self)
+///         .environmentObject(appData)
+/// }
+/// ```
 struct PracticeHistoryView: View {
     @Binding var navigationPath: NavigationPath
     @Environment(\.modelContext) private var modelContext
@@ -435,6 +471,14 @@ struct PracticeHistoryView: View {
     }
 }
 
+// MARK: - PracticeSessionRowView
+/// A compact row view displaying summary information for a single practice session.
+///
+/// Shows:
+/// - Formatted date and time
+/// - Session duration badge
+/// - Visual metrics (notes practiced, correct, retries)
+/// - Accuracy percentage with color coding (green ≥80%, orange ≥60%, red <60%)
 struct PracticeSessionRowView: View {
     let session: PracticeSession
     
@@ -510,6 +554,17 @@ struct PracticeSessionRowView: View {
     }
 }
 
+// MARK: - PracticeSessionDetailView
+/// A detailed view showing comprehensive information about a specific practice session.
+///
+/// This view displays:
+/// - **Session header**: Full date/time and duration
+/// - **Statistics**: First-try correct, multiple attempts, total attempts
+/// - **Settings**: Practice configuration (note count, accidentals, clef mode, MIDI range)
+/// - **Note-by-note results**: Detailed breakdown with staff visualization
+///
+/// The note results are grouped by target note and sorted chronologically, showing
+/// the complete history of attempts for each unique note practiced.
 struct PracticeSessionDetailView: View {
     let session: PracticeSession
     @Environment(\.dismiss) private var dismiss
@@ -669,7 +724,7 @@ struct PracticeSessionDetailView: View {
 
 // MARK: - Data Management View
 
-/// A view that provides data management options for practice history
+/// A view that provides data management options for practice history.
 ///
 /// This view allows users to:
 /// - View storage information (session count and database size)
@@ -678,7 +733,14 @@ struct PracticeSessionDetailView: View {
 /// - Manually delete old sessions
 /// - Clear all practice history
 ///
-/// Layout improvements:
+/// ## Retention Policies
+/// Users can select from several retention periods:
+/// - Forever (no automatic deletion)
+/// - 30 days, 90 days, 6 months, 1 year
+///
+/// When a retention period is set, the app automatically cleans up old sessions daily.
+///
+/// ## Layout Improvements
 /// - Uses `.fixedSize(horizontal: false, vertical: true)` to prevent text truncation
 /// - Applies `.formStyle(.grouped)` on macOS for better visual hierarchy
 /// - Uses VStack layout for retention period picker to avoid label cutoff
@@ -804,6 +866,10 @@ struct DataManagementView: View {
 // MARK: - Share Sheet Helper
 
 #if os(iOS)
+/// UIKit-based share sheet for exporting CSV files on iOS.
+///
+/// This view controller writes the CSV string to a temporary file and
+/// presents the native iOS share sheet for exporting the data.
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
@@ -822,6 +888,10 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 #else
+/// AppKit-based save panel for exporting CSV files on macOS.
+///
+/// This view presents a native macOS save dialog allowing the user to
+/// choose the destination for the exported CSV file.
 struct ShareSheet: NSViewRepresentable {
     let items: [Any]
     
