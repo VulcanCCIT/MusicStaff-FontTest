@@ -310,7 +310,7 @@ extension Clef: RawRepresentable {
         case "treble":
             self = .treble
         case "bass":
-            self = .bass"
+            self = .bass
         default:
             return nil
         }

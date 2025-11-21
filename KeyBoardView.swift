@@ -240,6 +240,14 @@ struct KeyBoardView: View {
             }
           }
         }
+        .overlay(alignment: .center) {
+          NodeOutputView(conductor.instrument, color: .red)
+            .frame(height: 48)
+            .frame(width: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(GlassReflection(cornerRadius: 8))
+            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+        }
         // Platform-specific vertical padding
         // macOS: Smaller padding for compact display
         // iOS/iPadOS: Larger padding for touch targets
